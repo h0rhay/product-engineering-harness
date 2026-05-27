@@ -11,6 +11,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.99.0
         version: 0.99.0
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: ^25.9.1
@@ -23,7 +26,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.7
-        version: 4.1.7(@types/node@25.9.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3))
+        version: 4.1.7(@types/node@25.9.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0))
 
 packages:
 
@@ -659,6 +662,11 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  yaml@2.9.0:
+    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
 snapshots:
 
   '@anthropic-ai/sdk@0.99.0':
@@ -855,13 +863,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.7(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3))':
+  '@vitest/mocker@4.1.7(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0))':
     dependencies:
       '@vitest/spy': 4.1.7
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)
+      vite: 8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0)
 
   '@vitest/pretty-format@4.1.7':
     dependencies:
@@ -1075,7 +1083,7 @@ snapshots:
 
   undici-types@7.24.6: {}
 
-  vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3):
+  vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -1087,11 +1095,12 @@ snapshots:
       esbuild: 0.28.0
       fsevents: 2.3.3
       tsx: 4.22.3
+      yaml: 2.9.0
 
-  vitest@4.1.7(@types/node@25.9.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)):
+  vitest@4.1.7(@types/node@25.9.1)(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.7
-      '@vitest/mocker': 4.1.7(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3))
+      '@vitest/mocker': 4.1.7(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0))
       '@vitest/pretty-format': 4.1.7
       '@vitest/runner': 4.1.7
       '@vitest/snapshot': 4.1.7
@@ -1108,7 +1117,7 @@ snapshots:
       tinyexec: 1.2.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vite: 8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)
+      vite: 8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.9.1
@@ -1119,3 +1128,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  yaml@2.9.0: {}
