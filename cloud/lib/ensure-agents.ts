@@ -18,9 +18,10 @@ function saveState(s: StateFile): void {
 }
 
 function buildTools(def: AgentDef): unknown[] {
+  const defaultConfig = { permission_policy: { type: "always_allow" } };
   return def.tools.map((t) => {
-    if (t === "agent_toolset_20260401") return { type: "agent_toolset_20260401" };
-    if (t.startsWith("mcp_toolset:")) return { type: "mcp_toolset", mcp_server_name: t.slice("mcp_toolset:".length) };
+    if (t === "agent_toolset_20260401") return { type: "agent_toolset_20260401", default_config: defaultConfig };
+    if (t.startsWith("mcp_toolset:")) return { type: "mcp_toolset", mcp_server_name: t.slice("mcp_toolset:".length), default_config: defaultConfig };
     throw new Error(`Unknown tool spec: ${t}`);
   });
 }

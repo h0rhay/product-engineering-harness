@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "cloud:run": "tsx cloud/run.ts",
+    "cloud:run": "tsx --env-file=.env cloud/run.ts",
     "test": "vitest run"
   },
   "keywords": [],
