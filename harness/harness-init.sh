@@ -75,6 +75,7 @@ ${TEST_CMDS_DEFAULT}
 # Add design-system, code-patterns, naming docs, etc. as your project grows.
 CONTEXT_FILES=(
   "CONTEXT.md"
+  "docs/rules.md"
 )
 
 # Where to find issues. Matt Pocock's local-markdown convention.
@@ -117,6 +118,36 @@ a spec, scratch pad, or implementation log.
 ## Terms
 
 (none yet — run /grill-with-docs to start building this glossary)
+EOF
+fi
+
+# ---------------------------------------------------------------------------
+# docs/rules.md — binding rules re-injected every Ralph iteration (only if absent)
+# ---------------------------------------------------------------------------
+if [[ ! -f "${PROJECT_DIR}/docs/rules.md" ]]; then
+  cat > "${PROJECT_DIR}/docs/rules.md" <<'EOF'
+# Binding Rules
+
+These rules are re-injected into every Ralph iteration. Agents must obey them
+over their own defaults. Add project-specific rules (data access, naming,
+dependencies) as the project grows.
+
+## Layout — every-layout (binding)
+
+All structure is composed from the `every-layout` primitives. This is the
+structural substrate; the design phase's aesthetic (typography, palette, motion)
+sits on top of it and does not replace it.
+
+- Compose with Stack, Box, Center, Cluster, Sidebar, Switcher.
+- Logical properties only (`margin-inline`, `padding-block`, `inline-size`),
+  never physical (`margin-left`, `width`).
+- Spacing and sizing from the modular scale (`--s-2` … `--s5`), not ad-hoc values.
+- No `@media` for layout reconfiguration; rely on intrinsic responsiveness
+  (flex-basis + flex-grow + min-inline-size).
+- No `px` except `1px` borders.
+- Constrain text to a measure (~60ch).
+
+See the `every-layout` skill for the full pattern set and the per-primitive CSS.
 EOF
 fi
 

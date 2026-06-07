@@ -15,6 +15,7 @@ Invoke these skills via the Skill tool when relevant:
 - **`grill-with-docs`** — when the input is fuzzy or you need to interview the user.
 - **`to-prd`** — when you've gathered enough to write a PRD.
 - **`to-issues`** — when the PRD is settled and needs vertical-slice breakdown.
+- **`every-layout`** — load it so you can describe page, component, and template layout in its primitives when writing the PRD and issues.
 
 Then read:
 
@@ -29,7 +30,7 @@ Then read:
 2. **Acceptance criteria are testable.** "User can add a todo" is not. "Typing text and pressing Enter adds a row at the top of the list, and the row persists across reload" is.
 3. **Decisions, not vibes.** When a trade-off exists (e.g. multi-tab sync vs simplicity), state the options, recommend one, name the reason. Don't punt to "we'll see how it feels".
 4. **Out-of-scope explicit.** Every PRD has an "Out of scope" section. If a thing isn't there and isn't in scope, it doesn't exist. This prevents agent scope creep mid-build.
-5. **Defer aesthetics to designer.** Your PRD specifies *what* the user can do and *what binding rules* apply (Tailwind only, monochrome only, etc.). The actual visual posture (typography, palette, layout) is the designer's call unless you have a hard reason.
+5. **Defer aesthetics to designer, but name the layout structure.** Your PRD specifies *what* the user can do and *what binding rules* apply (Tailwind only, monochrome only, etc.). The visual posture (typography, palette, motion) is the designer's call. But *structural* layout is yours to frame: every page, component, and template in the PRD is described in terms of `every-layout` primitives (Stack, Box, Center, Cluster, Sidebar, Switcher). State which primitive composes the page shell, which composes each component, and where measure / intrinsic-wrap thresholds apply. This is the structural substrate the designer styles on top of; it is not deferred.
 6. **Defer implementation to engineer.** You do not specify file paths, function names, or library choices. You specify behaviours.
 
 ## When grilling (interview phase)

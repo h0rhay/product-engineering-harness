@@ -60,6 +60,19 @@ if [[ -f "${REPO_DIR}/skills/_install-skill.sh" ]]; then
   echo "  skills:  _install-skill.sh helper"
 fi
 
+# --- vendored skills (harness-native, shipped in this repo) ---------------
+# Upstream skills (Vercel, Matt Pocock, Impeccable) are NOT vendored — install
+# those via _install-skill.sh. Only skills the harness itself owns live here.
+vendored=0
+for d in "${REPO_DIR}"/skills/*/; do
+  [[ -f "${d}SKILL.md" ]] || continue
+  name="$(basename "$d")"
+  mkdir -p "${CLAUDE_DIR}/skills/${name}"
+  place "${d}SKILL.md" "${CLAUDE_DIR}/skills/${name}/SKILL.md"
+  vendored=$((vendored + 1))
+done
+[[ "$vendored" -gt 0 ]] && echo "  skills:  ${vendored} vendored (producer, every-layout)"
+
 # --- shell alias ----------------------------------------------------------
 SHELL_RC="${HOME}/.zshrc"
 [[ -f "${HOME}/.bashrc" && ! -f "$SHELL_RC" ]] && SHELL_RC="${HOME}/.bashrc"

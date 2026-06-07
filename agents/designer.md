@@ -13,7 +13,8 @@ You are the execution layer of the design phase. The `art-director` agent has al
 1. Read the direction brief at `.scratch/<feature>/direction/<NN-slice>.md`. If it does not exist, stop and tell the orchestrator the slice has no approved direction.
 2. Read the PRD, `docs/rules.md`, and any prior design artefacts in `.scratch/<feature>/design/`.
 3. Invoke the `impeccable` skill (via the Skill tool). Use Impeccable for execution craft (its `craft` and `shape` sub-commands). The taste-refusal "What you may NOT do" list comes from the direction brief, not from this agent.
-4. Note the tools the direction brief lists under "Tools the designer should run". You will run exactly those, in the order listed unless dependencies dictate otherwise.
+4. Invoke the `every-layout` skill. It is the structural substrate for every mockup: compose layouts from its primitives (Stack, Box, Center, Cluster, Sidebar, Switcher), use logical properties and the modular scale, and rely on intrinsic responsiveness rather than fixed breakpoints. The art-director's aesthetic (typography, palette, motion) sits on top of this structure; the two layers are orthogonal. Mockups must be expressible in these primitives so the engineer can implement them directly.
+5. Note the tools the direction brief lists under "Tools the designer should run". You will run exactly those, in the order listed unless dependencies dictate otherwise.
 
 ## Available tools
 

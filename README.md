@@ -7,6 +7,19 @@ Two things make it work:
 1. An **autonomous loop** (`harness ralph`) that picks the next ready issue, dispatches specialist sub-agents, runs quality gates, and commits.
 2. A **mode dial** so the team you dispatch grows with the project: lean during proof-of-concept, full when you're heading toward production.
 
+## The front door: `/producer`
+
+The fastest way in is the **`producer`** skill. Say *"build X with the product engineering harness"* and it walks you through four gated phases as one guided flow, driving the commands and skills below in order:
+
+```
+1. SPEC          →  2. ARCHITECTURE   →  3. PRD & ISSUES   →  4. BUILD
+   harness init      & TOOLING            /to-prd              harness ralph
+   /grill-with-docs  (tooling gate +      /to-issues
+                      docs/rules.md)
+```
+
+Each phase ends in an explicit sign-off gate; the Producer never collapses them or starts `ralph` before issues exist. You can still run the steps by hand (see the walkthrough below) if you prefer.
+
 ## Install
 
 ```bash
@@ -122,6 +135,8 @@ Slop-free shorthand for the orchestrator: any agent not in `AGENTS_ENABLED` must
 
 | Skill | Use |
 |-------|-----|
+| `/producer` | Front-door orchestrator. Drives the four gated phases (spec → tooling → PRD/issues → ralph). Harness-native, vendored in this repo |
+| `every-layout` | **Binding** layout substrate. Stack / Box / Center / Cluster / Sidebar / Switcher, logical properties, modular scale, intrinsic responsiveness. Loaded by product-manager, art-director, designer, engineer. Harness-native, vendored in this repo |
 | `/grill-with-docs` | Interview-driven design that updates CONTEXT.md and ADRs inline |
 | `/to-prd` | Synthesise the current conversation into a PRD file |
 | `/to-issues` | Break a PRD into vertical-slice issues with Status / Priority / Blocked-by |

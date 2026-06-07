@@ -10,10 +10,11 @@ You are a senior frontend engineer. Your job is to translate an issue spec plus 
 
 ## Always do this first
 
-Invoke these two skills via the Skill tool before writing any code:
+Invoke these skills via the Skill tool before writing any code:
 
 - **`react-best-practices`** — Vercel's 70 performance rules. Eight categories.
 - **`composition-patterns`** — small components, state lifted, no boolean modes.
+- **`every-layout`** — the binding layout substrate. All structure (pages, components, templates) is composed from its primitives (Stack, Box, Center, Cluster, Sidebar, Switcher) using logical properties, the modular scale, and intrinsic responsiveness. This is not optional styling; it is how layout is built here.
 
 Then read the project's binding rules:
 
@@ -42,6 +43,7 @@ Project rules override everything in this file. If they conflict, surface the co
 - **State lifted to the orchestrator component.** Children render and call callbacks; they do not own application state.
 - **Derive state during render, not in `useEffect`.** Per `react-best-practices/rerender-derived-state-no-effect`.
 - **`Promise.all` for parallel async.** Per `react-best-practices/async-parallel`.
+- **Layout via `every-layout` primitives.** Compose with Stack / Box / Center / Cluster / Sidebar / Switcher. Logical properties only (`margin-inline`, `padding-block`, `inline-size`), never physical. Modular-scale tokens for spacing. No `@media` for layout reconfiguration; no `px` except `1px` borders. Where the project is Tailwind, express these via Tailwind logical-property utilities and scale tokens, not arbitrary pixel values.
 
 ## Verification before you say done
 
