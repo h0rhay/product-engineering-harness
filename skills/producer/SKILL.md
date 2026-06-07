@@ -25,6 +25,19 @@ Trigger when the user says any of:
 
 Do NOT use for: single-file edits, bug fixes, or work on a project that already has issues ready (`harness status` shows ready issues). Those go straight to `harness ralph --once` or the relevant skill.
 
+## Phase marker (statusline indicator)
+
+The Producer announces the current phase to the terminal statusline by writing a marker file at the project root: `.claude/harness-phase`. The statusline renders it as `🎬 PRODUCER · <n>/4 <Phase>`.
+
+- At the **start of each phase**, overwrite the file with the phase label:
+  - Phase 1: `printf '1/4 Spec' > .claude/harness-phase`
+  - Phase 2: `printf '2/4 Tooling' > .claude/harness-phase`
+  - Phase 3: `printf '3/4 PRD & Issues' > .claude/harness-phase`
+  - Phase 4: `printf '4/4 Build' > .claude/harness-phase`
+- When the build completes, or the user abandons the run, **clear it**: `rm -f .claude/harness-phase`.
+
+Write the marker as the first action of each phase, before doing the phase's work. Keep the label under 40 characters.
+
 ## The Four Phases
 
 The Producer runs these strictly in order. Each is a gate.
