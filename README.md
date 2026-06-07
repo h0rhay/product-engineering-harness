@@ -31,6 +31,28 @@ source ~/.zshrc         # pick up the `harness` alias
 
 `install.sh` copies the agents and harness scripts into `~/.claude/`, adds the `harness` shell alias, and appends the Engineering Contract to `~/.claude/CLAUDE.md`. It then prints the prerequisite skills + design tooling to install (Vercel + Matt Pocock + Impeccable skills, Pencil CLI, SkillUI).
 
+### Optional: statusline phase indicator
+
+The `producer` skill writes the active phase to `<project>/.claude/harness-phase` (e.g. `2/4 Tooling`) at the start of each phase, and clears it on completion. `install.sh` does **not** touch your statusline — wiring it in is a manual, one-time edit to your own `~/.claude/statusline-command.sh` so it can render the marker, e.g. `🎬 PRODUCER · 2/4 Tooling`.
+
+Add this near the top of the script (after it has the session's `cwd`):
+
+```bash
+# Product engineering harness phase (written by the producer skill)
+PROJECT_ROOT="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null || echo "$CWD")"
+HARNESS_PHASE=""
+[ -f "$PROJECT_ROOT/.claude/harness-phase" ] && \
+  HARNESS_PHASE=$(head -n1 "$PROJECT_ROOT/.claude/harness-phase" | tr -d '\n' | cut -c1-40)
+```
+
+Then render it wherever you build the line, only when set:
+
+```bash
+[ -n "$HARNESS_PHASE" ] && printf '🎬 PRODUCER · %s ' "$HARNESS_PHASE"
+```
+
+No marker means no segment, so your statusline is unchanged outside an active `producer` run. Add `.claude/harness-phase` to the project's `.gitignore` if you don't want the transient marker committed.
+
 ---
 
 ## Architecture in one screen
