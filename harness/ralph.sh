@@ -263,6 +263,7 @@ CRITICAL: every agent must respect the BINDING CONTEXT. If a delegated agent's o
 
   set +e
   claude --dangerously-skip-permissions --verbose -p "$PROMPT" \
+    --model "${ORCHESTRATOR_MODEL:-opus}" \
     --output-format stream-json 2>/dev/null \
     | bash "$HARNESS_DIR/ralph-progress.sh" "$OUTPUT_FILE"
   claude_exit=${PIPESTATUS[0]}

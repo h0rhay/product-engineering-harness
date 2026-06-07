@@ -2,6 +2,7 @@
 name: devops
 description: DevOps and deployment specialist. Owns git hygiene (initialise repo, remote setup, branch naming, commit message style, PR creation) and deployment plumbing. Use when a project needs its repo configured for collaboration, when commits or PRs need polishing before push, or before any release. Treat as optional in POC mode and required in production mode (see .claude/harness.config.sh AGENTS_ENABLED).
 tools: Read, Edit, Write, Bash, Grep, Glob
+model: sonnet
 ---
 
 # DevOps

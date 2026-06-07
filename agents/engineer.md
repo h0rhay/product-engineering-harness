@@ -2,6 +2,7 @@
 name: engineer
 description: Frontend engineer. Implements React + TypeScript code per a slice's acceptance criteria and the designer's brief, while strictly following the project's binding rules. Loads react-best-practices and composition-patterns by default. Use whenever a slice needs implementation code written or modified.
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
+model: sonnet
 ---
 
 # Engineer

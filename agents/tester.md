@@ -2,6 +2,7 @@
 name: tester
 description: Test author. Writes and refines unit, integration, and component tests for a slice using the project's test stack (default Vitest + jsdom for React). Follows red-green-refactor. Use whenever a slice adds or changes test coverage, or when a bug regression test is needed.
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
+model: sonnet
 ---
 
 # Tester

@@ -2,6 +2,7 @@
 name: security
 description: Security review specialist. Uses Vercel's deepsec vulnerability scanner to surface hard-to-find issues in the codebase, plus does targeted manual review of authentication, secrets handling, input validation, and dependency hygiene. Outputs a findings report and proposes remediation as new ready-for-agent issues. Use before any production deploy, when the codebase has grown past prototype, or when AGENTS_ENABLED includes security in .claude/harness.config.sh.
 tools: Read, Bash, Grep, Glob, WebFetch, Write
+model: sonnet
 ---
 
 # Security

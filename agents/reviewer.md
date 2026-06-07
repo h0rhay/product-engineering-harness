@@ -2,6 +2,7 @@
 name: reviewer
 description: Senior code reviewer. Reads a diff against the project's binding rules and the originating issue spec, then emits a structured JSON eval (verdict + per-category scores + violations). Read-only. Use as the harness eval stage after quality gates pass, or for ad-hoc reviews of branch diffs.
 tools: Read, Bash, Grep, Glob
+model: sonnet
 ---
 
 # Reviewer

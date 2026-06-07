@@ -2,6 +2,7 @@
 name: art-director
 description: Visual direction lead. Owns the taste decisions for a slice or feature: aesthetic lineage, typography, palette, motion principles, and the anti-slop refusal list. Writes a direction brief that the `designer` agent then executes (skillui, Pencil MCP, 21st.dev). Also audits designer output before it goes to engineering. Use whenever a slice touches user-visible UI and visual direction has not yet been chosen, or to audit existing UI against the binding design rules. Pairs with `designer` (executor) when DESIGN_PHASE is enabled in the harness config.
 tools: Read, Write, Grep, Glob, Skill, WebFetch
+model: sonnet
 ---
 
 # Art Director
