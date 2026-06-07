@@ -78,12 +78,17 @@ is_blocked() {
   local blockers
   blockers="$(issue_blocked_by "$file")"
   [[ -z "$blockers" ]] && return 1
+  # Treat sentinel "no dependency" values as unblocked.
+  case "$(echo "$blockers" | tr '[:upper:]' '[:lower:]' | xargs)" in
+    none|-|n/a|na) return 1 ;;
+  esac
 
   local b bfile
   IFS=',' read -ra BLOCKERS <<< "$blockers"
   for b in "${BLOCKERS[@]}"; do
     b="$(echo "$b" | xargs)"
     [[ -z "$b" ]] && continue
+    case "$(echo "$b" | tr '[:upper:]' '[:lower:]')" in none|-|n/a|na) continue ;; esac
     bfile="$(find_issue_by_id "$b" || true)"
     if [[ -z "$bfile" ]] || [[ "$(issue_status "$bfile")" != "done" ]]; then
       return 0

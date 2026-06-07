@@ -51,12 +51,16 @@ for f in $ISSUES_GLOB; do
 
   if [[ "$s" == "ready-for-agent" ]]; then
     blockers="$(get_field "$f" "Blocked-by")"
+    case "$(echo "$blockers" | tr '[:upper:]' '[:lower:]' | xargs)" in
+      none|-|n/a|na) blockers="" ;;
+    esac
     if [[ -n "$blockers" ]]; then
       blocked=0
       IFS=',' read -ra BS <<< "$blockers"
       for b in "${BS[@]}"; do
         b="$(echo "$b" | xargs)"
         [[ -z "$b" ]] && continue
+        case "$(echo "$b" | tr '[:upper:]' '[:lower:]')" in none|-|n/a|na) continue ;; esac
         bfile=""
         for cand in $ISSUES_GLOB; do
           [[ -f "$cand" ]] || continue
