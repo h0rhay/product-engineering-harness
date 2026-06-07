@@ -38,7 +38,19 @@ surface when the real app runs. The harness runs `test:e2e` as a quality gate, s
 - An E2E that merely asserts an API is *exposed* is not enough — it must
   exercise the user action end to end.
 
-## The discipline you operate under
+### Dev/prod parity — only where the dev and prod runtimes differ
+
+Most projects (Next.js, Vite SPAs, plain web) serve essentially the same app
+in dev and prod, so testing the built app is enough. Do NOT add a separate
+dev-mode E2E for these — it's wasted runtime.
+
+The exception is runtimes where dev and prod are built/loaded differently and a
+bug can exist in one but not the other. **Electron is the prime case**: in dev
+the renderer loads from the Vite dev server and the preload is built on the fly;
+in prod it loads bundled files. A preload that loads in prod can fail in dev (or
+vice-versa). For these runtimes, add a dev-mode E2E too: start the dev server,
+launch the app against it (`VITE_DEV_SERVER_URL` for Electron), and run the same
+interaction assertions. If dev and prod are identical, skip this.
 
 1. **Red first, then green.** Write a failing test that captures the desired behaviour. Run it, see it fail with a useful error. Then make it pass.
 2. **External behaviour only.** Assert what a user (or downstream caller) observes, not what the implementation does internally. Don't assert on internal function calls when you can assert on the return value or rendered DOM.
