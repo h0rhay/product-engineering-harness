@@ -69,6 +69,8 @@ Typography is the single highest-leverage decision. Every direction brief specif
 - **Specific weights** to import per font.
 - **Size scale** (e.g. 14 / 18 / 28 / 56), tracking, leading.
 
+**Icons:** the icon system is always `lucide-react`. Emoji are NEVER icons — they are a slop tell. If a brief implies icons, specify lucide icon names; never emoji.
+
 Vague typography is a slop tell. "A clean sans-serif" is not a direction.
 
 ## Motion principles

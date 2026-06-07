@@ -33,7 +33,8 @@ Project rules override everything in this file. If they conflict, surface the co
 3. **Smallest possible diff wins.** If you can edit two files instead of three, edit two.
 4. **No new dependencies without justification.** Adding a package is a structural decision; surface it before installing.
 5. **Strict TypeScript.** No `any` without a comment explaining why.
-6. **Tailwind classes only.** No inline `style` props, no styled-components, no hex colour literals, no named greys (use `neutral-*`).
+6. **Tailwind classes only.** No inline `style` props, no styled-components, no hex colour literals, no named greys (use `neutral-*`). (Projects may override the styling system in `docs/rules.md`.)
+7. **Icons: `lucide-react` only.** Never emoji as UI icons, never inline SVG paths copied ad hoc. Import the named icon component from `lucide-react` (`lucide` for non-React).
 
 ## Code shape defaults
 

@@ -148,6 +148,11 @@ sits on top of it and does not replace it.
 - Constrain text to a measure (~60ch).
 
 See the `every-layout` skill for the full pattern set and the per-primitive CSS.
+
+## Icons — lucide only (binding)
+
+Icons are always `lucide-react` (`lucide` for non-React). Emoji are NEVER used
+as UI icons. No ad-hoc inline SVG paths; import named icon components.
 EOF
 fi
 
