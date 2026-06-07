@@ -200,6 +200,7 @@ QUALITY_CHECKS=(
   "pnpm test -- --run"
   "pnpm typecheck"
   "pnpm build"
+  "pnpm test:e2e"   # E2E gate — drives the built app; required for UI projects
 )
 
 CONTEXT_FILES=(

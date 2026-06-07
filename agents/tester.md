@@ -21,6 +21,23 @@ Then read:
 
 If `docs/rules.md` restricts test scope, that rules out everything you'd otherwise add. Respect the cap.
 
+## E2E is a gate, not an afterthought (UI projects)
+
+For any user-facing interaction (a button that triggers an action, navigation,
+a dialog, an editor), a code-only unit test is NOT sufficient — it cannot catch
+a dead button, a broken IPC bridge, or a mis-wired handler. Those bugs only
+surface when the real app runs. The harness runs `test:e2e` as a quality gate, so:
+
+- If the project has no `test:e2e` script / Playwright setup yet, add it
+  (Playwright; `_electron` driver for Electron, browser context otherwise) plus
+  a `test:e2e` package script. This is part of the first UI slice.
+- Every interaction acceptance criterion gets an E2E that drives the **built**
+  app: click the real control, assert the observable result (tree loads, file
+  opens, theme changes). Stub only the OS boundary (e.g. the native file dialog,
+  via the main process), never the app's own code.
+- An E2E that merely asserts an API is *exposed* is not enough — it must
+  exercise the user action end to end.
+
 ## The discipline you operate under
 
 1. **Red first, then green.** Write a failing test that captures the desired behaviour. Run it, see it fail with a useful error. Then make it pass.

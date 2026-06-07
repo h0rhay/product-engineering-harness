@@ -38,15 +38,26 @@ echo
 if [[ -f "${PROJECT_DIR}/pnpm-lock.yaml" ]]; then
   TEST_CMDS_DEFAULT='  "pnpm lint"
   "pnpm test"
-  "pnpm typecheck"'
+  "pnpm typecheck"
+  "pnpm build"
+  # E2E gate — runs the real built app. Required for any UI project so
+  # interaction bugs cannot pass code-only checks. Provide a "test:e2e"
+  # script (Playwright). Remove this line only for non-UI projects (libs/CLIs).
+  "pnpm test:e2e"'
 elif [[ -f "${PROJECT_DIR}/package-lock.json" ]]; then
   TEST_CMDS_DEFAULT='  "npm run lint"
   "npm test"
-  "npm run typecheck"'
+  "npm run typecheck"
+  "npm run build"
+  # E2E gate — see note above. Remove only for non-UI projects.
+  "npm run test:e2e"'
 elif [[ -f "${PROJECT_DIR}/yarn.lock" ]]; then
   TEST_CMDS_DEFAULT='  "yarn lint"
   "yarn test"
-  "yarn typecheck"'
+  "yarn typecheck"
+  "yarn build"
+  # E2E gate — see note above. Remove only for non-UI projects.
+  "yarn test:e2e"'
 else
   TEST_CMDS_DEFAULT='  # "your-test-command-here"'
 fi
