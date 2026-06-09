@@ -10,7 +10,10 @@ Before starting any coding task that needs 3 or more steps, do this:
 1. **Announce skills.** Name the relevant skills from the available-skills list that apply to this task (e.g. `react-best-practices`, `composition-patterns`).
 2. **Name the specific rules.** Within those skills, list the specific rules that will govern the work (e.g. `bundle-barrel-imports`, `rerender-no-inline-components`, "Tailwind-only styling per project CLAUDE.md").
 3. **Pause for sign-off.** Wait for the user to approve, adjust, or add to the list before touching code.
-4. **Self-audit on completion.** After implementation, before reporting complete, run through each named rule against the diff and state pass/fail. Fix failures, then re-audit. Do not claim work complete until the audit is clean.
+4. **Self-audit on completion.** After implementation, before reporting complete:
+   a. Run through each named rule against the diff and state pass/fail.
+   b. **Primitive-extraction audit.** Scan the diff for class-string patterns (or markup shapes) that appear 3 or more times across the codebase or this diff. For each: name the pattern, name the primitive that should own it, decide whether to extract now (preferred) or surface as a follow-up issue. Report the finding.
+   c. Fix failures, then re-audit. Do not claim work complete until the audit is clean.
 
 This contract overrides the default "just start coding" behaviour. Skip it only for trivial single-file edits, typo fixes, and explicit one-shot user instructions ("just change X to Y").
 ```
