@@ -187,6 +187,21 @@ Slop-free shorthand for the orchestrator: any agent not in `AGENTS_ENABLED` must
 
 ---
 
+## Architecture reference docs
+
+- [`docs/rules-baseline.md`](docs/rules-baseline.md) — framework-agnostic
+  rules to copy into a project's `docs/rules.md` during Phase 2:
+  primitives + wrappers (with the proactive 3+-callsites trigger),
+  behaviour primitives from your a11y library (Radix/headlessui/bits-ui),
+  component-CSS-co-location, verified-sources mode-aware (clone vs
+  greenfield), self-baselines as drift guards.
+- [`docs/anti-pattern-hook.md`](docs/anti-pattern-hook.md) — the PreToolUse
+  hook pattern for flagging anti-patterns about to be reintroduced after
+  a primitive is extracted. Includes the project-agnostic `FLAG_ISLAND`
+  / `FLAG_SWIPER` flags and shows how to add project-specific ones.
+
+---
+
 ## Per-project configuration
 
 Lives at `.claude/harness.config.sh` after `harness init`. Example:
