@@ -181,6 +181,26 @@ echo "Iterations: $MAX_ITER"
 echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "========================================"
 
+# ---------------------------------------------------------------------------
+# Resolve orchestrator model
+# Prefer Fable 5; fall back to Opus 4.7 if Fable access is unavailable.
+# Set ORCHESTRATOR_MODEL to override entirely.
+# ---------------------------------------------------------------------------
+if [[ -z "${ORCHESTRATOR_MODEL:-}" ]]; then
+  PREFERRED_MODEL="claude-fable-5"
+  FALLBACK_MODEL="claude-opus-4-7"
+  echo -n "Probing $PREFERRED_MODEL access... "
+  if claude --model "$PREFERRED_MODEL" -p "ok" >/dev/null 2>&1; then
+    ORCHESTRATOR_MODEL="$PREFERRED_MODEL"
+    echo "ok"
+  else
+    ORCHESTRATOR_MODEL="$FALLBACK_MODEL"
+    echo "unavailable, using $FALLBACK_MODEL"
+  fi
+fi
+echo "Orchestrator model: $ORCHESTRATOR_MODEL"
+echo "========================================"
+
 for ((i=1; i<=MAX_ITER; i++)); do
   echo
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -257,7 +277,7 @@ CRITICAL: every agent must respect the BINDING CONTEXT. If a delegated agent's o
 
   set +e
   claude --dangerously-skip-permissions --verbose -p "$PROMPT" \
-    --model "${ORCHESTRATOR_MODEL:-opus}" \
+    --model "$ORCHESTRATOR_MODEL" \
     --output-format stream-json 2>/dev/null \
     | bash "$HARNESS_DIR/ralph-progress.sh" "$OUTPUT_FILE"
   claude_exit=${PIPESTATUS[0]}
