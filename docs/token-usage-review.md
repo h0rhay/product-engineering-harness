@@ -68,21 +68,17 @@ agent's `description` field; the description is enough.
 **Estimated saving: ~50% of the orchestrator prompt's per-iteration
 cost** (~600 tokens per issue, paid once per ralph iteration).
 
-#### 3. Engineer's skill loading is unconditional
+#### 3. ~~Conditional skill loading in engineer~~ — REJECTED
 
-Engineer loads `react-best-practices` + `composition-patterns` +
-`every-layout` on **every** dispatch. Those three SKILL.md files sum
-to ~16 KB ≈ 4000 tokens. For a typo fix, accessibility-label tweak,
-or token rename, that's pure overhead.
+*Originally proposed: load `react-best-practices` + `composition-patterns`
++ `every-layout` only when the slice touches new components / layout /
+interactive React.*
 
-Add a conditional rule to `engineer.md`: load the heavyweight skills
-only when the issue touches *new components*, *layout*, or
-*interactive React patterns*. For micro-edits, skip the skills —
-the binding rules in `docs/rules.md` already cover the constraints.
-
-**Estimated saving: 3000–4000 tokens per non-component-creating
-engineer dispatch** (probably 30–40% of engineer dispatches in any
-mature codebase).
+Rejected after review: those three skills are how the engineer
+*thinks*, not optional knowledge. Making them conditional saves
+tokens by making the engineer dumber on small slices, which is
+exactly the wrong direction. The skills stay unconditional. Recorded
+here as a non-trade-off for future reference.
 
 ### MEDIUM impact
 
@@ -180,11 +176,12 @@ win, but it's a different architecture. Worth pitching as the
 
 ## Recommended order
 
-1. **Quick wins** (1–2 hours, low risk):
+1. **Quick wins** — DONE in this PR:
    - Reviewer + DevOps to Haiku 4.5 (~30% saving on those agents)
    - Trim orchestrator prompt's capability paragraphs (~50% saving on
      orchestrator-prompt cost per iteration)
-   - Conditional skill loading in engineer.md
+   - ~~Conditional skill loading in engineer.md~~ — rejected; the
+     skills are how engineer thinks, not optional knowledge.
 
 2. **Medium wins** (1 day, medium risk):
    - Parallel-dispatch wiring for genuinely independent sub-tasks
