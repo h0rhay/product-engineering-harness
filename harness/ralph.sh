@@ -181,6 +181,26 @@ echo "Iterations: $MAX_ITER"
 echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "========================================"
 
+# ---------------------------------------------------------------------------
+# Resolve orchestrator model
+# Prefer Fable 5; fall back to Opus 4.7 if Fable access is unavailable.
+# Set ORCHESTRATOR_MODEL to override entirely.
+# ---------------------------------------------------------------------------
+if [[ -z "${ORCHESTRATOR_MODEL:-}" ]]; then
+  PREFERRED_MODEL="claude-fable-5"
+  FALLBACK_MODEL="claude-opus-4-7"
+  echo -n "Probing $PREFERRED_MODEL access... "
+  if claude --model "$PREFERRED_MODEL" -p "ok" >/dev/null 2>&1; then
+    ORCHESTRATOR_MODEL="$PREFERRED_MODEL"
+    echo "ok"
+  else
+    ORCHESTRATOR_MODEL="$FALLBACK_MODEL"
+    echo "unavailable, using $FALLBACK_MODEL"
+  fi
+fi
+echo "Orchestrator model: $ORCHESTRATOR_MODEL"
+echo "========================================"
+
 for ((i=1; i<=MAX_ITER; i++)); do
   echo
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -211,19 +231,13 @@ for ((i=1; i<=MAX_ITER; i++)); do
 
 OUTPUT DISCIPLINE: Be terse. No preamble, no recap, no narration. Output only what's load-bearing: tool calls and a final summary. Treat every token as scarce.
 
-YOUR TEAM (dispatch via the Agent tool, using subagent_type). Only the agents listed below as ENABLED may be dispatched on this project; agents not listed must NOT be invoked:
+YOUR TEAM (dispatch via the Agent tool, using subagent_type). Only the agents listed below as ENABLED may be dispatched on this project; agents not listed must NOT be invoked. Each agent's full capability is in its .md frontmatter description, surfaced by the Agent tool — do not re-describe them here.
 
 ENABLED on this project: ${AGENTS_ENABLED[*]}
 
-Capabilities (only dispatch ones in the ENABLED list):
-  • product-manager — clarifies scope and acceptance criteria when the issue is ambiguous.
-  • art-director — owns visual taste decisions: aesthetic lineage, typography, palette, motion, anti-slop refusal list. Writes a direction brief to .scratch/<feature>/direction/<NN-slice>.md AND audits designer output afterward.
-  • designer — executes the direction brief: runs skillui to distil reference sites, drives Pencil MCP to produce mockups, fetches 21st.dev examples via Firecrawl. Does NOT make taste decisions; if direction is missing or ambiguous it escalates back to you.
-  • engineer — writes / edits React + TypeScript code. For visual slices, reads the approved mockup and the direction brief; implements faithfully.
-  • tester — writes Vitest tests when the slice requires them.
-  • devops — git hygiene, remote setup, branch/commit/PR conventions, deployment plumbing. Invoke when the slice is ready to be pushed or a release is imminent.
-  • security — vulnerability scan (deepsec) + manual checklist. Invoke before any production deploy or when explicitly requested. Costs real money; never run deepsec scan without user confirmation.
-  • reviewer — DO NOT call. The harness runs reviewer after you finish.
+Two non-obvious constraints:
+  - reviewer — DO NOT call. The harness runs reviewer after you finish.
+  - security — never run a deepsec scan without explicit user confirmation; it costs real money.
 
 DELEGATION RULES:
   - You do NOT write code, tests, or design specs yourself. Delegate to the appropriate specialist.
@@ -263,7 +277,7 @@ CRITICAL: every agent must respect the BINDING CONTEXT. If a delegated agent's o
 
   set +e
   claude --dangerously-skip-permissions --verbose -p "$PROMPT" \
-    --model "${ORCHESTRATOR_MODEL:-opus}" \
+    --model "$ORCHESTRATOR_MODEL" \
     --output-format stream-json 2>/dev/null \
     | bash "$HARNESS_DIR/ralph-progress.sh" "$OUTPUT_FILE"
   claude_exit=${PIPESTATUS[0]}
