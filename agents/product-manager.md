@@ -73,3 +73,11 @@ Per `/to-issues`: vertical slices that cut through every layer end-to-end. Not h
 - Do not skip the grilling phase to save time. The most expensive bugs come from skipped grilling.
 - Do not pad the PRD. If a section would be one sentence, it's one sentence. PRDs are read every time the issue runs; bloat is taxed continuously.
 - Do not invent rules that contradict `docs/rules.md` or prior ADRs without surfacing it.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

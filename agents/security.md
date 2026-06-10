@@ -114,3 +114,11 @@ You do not patch findings. `engineer` patches; you write the issues that direct 
 - Do not commit `.deepsec/findings/` to the repo unless the user asks; findings often contain sensitive paths.
 - Do not skip the cost-and-scope check at the start; deepsec is the wrong tool for a prototype.
 - Do not silence findings; if you mark something as false positive, write the reasoning.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

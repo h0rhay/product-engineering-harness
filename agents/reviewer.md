@@ -82,3 +82,11 @@ Omit `visual_posture` from `scores` when the diff has no UI changes. The `violat
 - Do not suggest fixes; just report. The implementer agent gets the report and decides.
 - Do not score things you weren't asked to score (e.g. don't invent a `documentation` category).
 - Do not output anything except the JSON object.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

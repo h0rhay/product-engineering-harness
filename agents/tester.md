@@ -100,3 +100,11 @@ You are usually invoked by an orchestrator that has already chosen which behavio
 - Do not write tests that pass without exercising the code (assert `true === true` style). The red phase is non-negotiable.
 - Do not mock the thing you're testing.
 - Do not silence flaky tests with retries; fix the test or report the flake.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

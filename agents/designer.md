@@ -125,3 +125,11 @@ Do not silently fix taste calls. Send them back up.
 - **`art-director`** — never directly. If the brief needs clarification, write a note for the orchestrator and stop.
 - **`engineer`** — never directly. Engineer reads your mockup files when the orchestrator routes the slice that way, after art-director's audit pass.
 - **`reviewer`** — never directly. Reviewer is invoked by the harness eval stage, after engineer's commit.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

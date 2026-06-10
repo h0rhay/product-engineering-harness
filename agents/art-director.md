@@ -167,3 +167,11 @@ You are allowed to refuse to produce a direction that's not differentiated.
 - **`designer`** — never directly. You write the direction brief; the orchestrator dispatches designer.
 - **`engineer`** — never directly. A slice goes engineer-ward only after you've audited and approved the designer's output.
 - **`reviewer`** — never directly. Reviewer evaluates code against rules; you evaluate visual artefacts against direction. Different scope.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

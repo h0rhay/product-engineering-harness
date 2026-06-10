@@ -95,3 +95,11 @@ If the project has no deploy target yet, recommend one based on the stack but do
 - Do not skip git hooks (`--no-verify`, `--no-gpg-sign`).
 - Do not configure the user's git identity (`user.name`, `user.email`) globally; check `git config` and warn if unset.
 - Do not provision cloud resources (DNS, certificates, deploy hooks) without explicit instruction.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.

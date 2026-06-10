@@ -100,3 +100,11 @@ You are inside an orchestrator-driven loop. You should request these agents when
 - Do not refactor unrelated code in the slice. "Drive-by cleanup" is out of scope; raise it as a separate issue if it matters.
 - Do not add comments that restate the code. A function name beats a comment.
 - Do not add `// TODO` markers. Either do it, or note it in your final report.
+
+## Token discipline (harness default)
+
+Context and usage limits are shared across the whole ralph run. If you
+have the Skill tool, load the `tokenwise` skill before starting work.
+Either way, operate tokenwise: terse output, no preamble or recap,
+never restate file contents you just read, summaries over transcripts,
+targeted reads (grep, offset/limit) over whole-file dumps.
