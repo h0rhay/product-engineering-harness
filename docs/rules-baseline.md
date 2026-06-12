@@ -95,6 +95,25 @@ above. Stop, use the primitive.
 
 ---
 
+## Work WITH the library — no positioning workarounds (BINDING)
+
+When a library component renders or positions unexpectedly, the bug is
+the agent's understanding of its mechanism, not the pixels. Read the
+library's documentation and use the INTENDED pattern. Never fight a
+positioning system with absolute/fixed magic offsets, z-index
+inflation, transform nudges, or !important overrides. Positioning that
+implements the documented pattern is fine — and must carry a citation
+comment in the same edit (`/* cite: <source> */`). If the intended
+mechanism cannot produce the design, STOP and escalate; a painted-over
+symptom is a violation even when pixels match. Enforce mechanically
+with the PreToolUse hook in hooks/no-positioning-hacks.sh (blocks
+uncited positioning smells at write time).
+
+Origin incident: a Radix NavigationMenu Viewport — which by design
+renders all panels at the menu root — was "fixed" with offset
+utilities instead of being removed per the docs (per-trigger anchoring
+= Content inside a relative Item, no Viewport).
+
 ## Component-specific CSS lives with the component (BINDING)
 
 `global.css` (or its equivalent) carries **foundational concerns only**:

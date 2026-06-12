@@ -101,6 +101,16 @@ You are inside an orchestrator-driven loop. You should request these agents when
 - Do not add comments that restate the code. A function name beats a comment.
 - Do not add `// TODO` markers. Either do it, or note it in your final report.
 
+## Library-fighting is forbidden (harness default)
+
+If a library component positions or renders unexpectedly, your next
+action is reading its documentation — never an absolute/fixed offset,
+z-index bump, transform nudge, or !important override to force the
+visual outcome. Positioning that implements the documented pattern
+needs a `/* cite: ... */` comment in the same edit (a PreToolUse hook
+blocks it otherwise). If the documented mechanism can't achieve the
+design, stop and escalate in your report.
+
 ## Token discipline (harness default)
 
 Context and usage limits are shared across the whole ralph run. If you
