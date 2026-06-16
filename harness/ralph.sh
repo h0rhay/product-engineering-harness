@@ -5,6 +5,11 @@
 
 set -euo pipefail
 
+# CI=true tells pnpm to skip the interactive "remove modules dir?" prompt
+# that aborts in non-TTY contexts (parallel worktrees, CI, background runs).
+# Safe in all contexts — ralph never asks the user before this point.
+export CI=true
+
 HARNESS_DIR="${HARNESS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 PROJECT_DIR="$(pwd)"
 CONFIG_FILE="${PROJECT_DIR}/.claude/harness.config.sh"
@@ -14,16 +19,58 @@ CONFIG_FILE="${PROJECT_DIR}/.claude/harness.config.sh"
 # ---------------------------------------------------------------------------
 MAX_ITER=10
 TARGET_ID=""
+PARALLEL=0
+PARALLEL_MAX="${RALPH_PARALLEL_MAX:-4}"
+SCOPE_GLOB=""
+MERGE_READY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --once)         MAX_ITER=1; shift ;;
     --target)       TARGET_ID="${2:-}"; shift 2 ;;
-    -h|--help)      echo "Usage: harness ralph [N] [--once] [--target ID]"; exit 0 ;;
+    --parallel)     PARALLEL=1; shift ;;
+    --scope)        SCOPE_GLOB="${2:-}"; shift 2 ;;
+    --merge-ready)  MERGE_READY=1; shift ;;
+    -h|--help)      echo "Usage: harness ralph [N] [--once] [--target ID] [--parallel] [--scope GLOB] [--merge-ready]"; exit 0 ;;
     [0-9]*)         MAX_ITER="$1"; shift ;;
     *)              echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
+
+if (( MERGE_READY )); then
+  echo "Sweeping ralph/parallel-* branches with passing issues..."
+  CURRENT="$(git rev-parse --abbrev-ref HEAD)"
+  MERGED=0
+  SKIPPED=0
+  for br in $(git for-each-ref --format='%(refname:short)' refs/heads/ralph/parallel-*); do
+    # Look up the issue id from branch name: ralph/parallel-<id>-<ts>
+    bn="${br#ralph/parallel-}"
+    id="${bn%-*}"
+    issue_file=""
+    for f in issues/*/*.md .scratch/*/issues/*.md; do
+      [[ -f "$f" ]] || continue
+      if [[ "$(basename "$f" .md | sed -E 's/^[0-9]+-//')" == "$id" ]]; then
+        issue_file="$f"
+        break
+      fi
+    done
+    status=""
+    [[ -n "$issue_file" ]] && status="$(grep -m1 -i '^Status:' "$issue_file" | sed 's/^[^:]*:[[:space:]]*//')"
+    if [[ "$status" == "done" ]]; then
+      echo "  merging $br..."
+      if git merge --no-ff -m "ralph(parallel): merge $id" "$br" >/dev/null 2>&1; then
+        ((MERGED++))
+      else
+        echo "  ✗ merge conflict on $br — left for manual resolution"
+      fi
+    else
+      echo "  skip $br (status: ${status:-unknown})"
+      ((SKIPPED++))
+    fi
+  done
+  echo "Merged: $MERGED | Skipped: $SKIPPED"
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Load project config
@@ -171,6 +218,43 @@ notify() {
 }
 
 # ---------------------------------------------------------------------------
+# Pre-flight: in a git worktree, link .env and node_modules from the primary
+# repo if missing. Fail-fast on missing target id BEFORE any build runs.
+# ---------------------------------------------------------------------------
+preflight() {
+  local git_dir common_dir primary
+  if git_dir=$(git rev-parse --git-dir 2>/dev/null); then
+    common_dir=$(git rev-parse --git-common-dir 2>/dev/null)
+    if [[ -n "$common_dir" && "$git_dir" != "$common_dir" ]]; then
+      primary=$(cd "$common_dir/.." && pwd)
+      if [[ -f "$primary/.env" && ! -e "$PROJECT_DIR/.env" ]]; then
+        ln -s "$primary/.env" "$PROJECT_DIR/.env"
+        echo "preflight: linked .env from $primary"
+      fi
+      # node_modules: real install per worktree, serialized via flock so
+      # parallel worktrees don't race on pnpm's global content store.
+      # The lock file lives at the primary repo so all worktrees share it.
+      if [[ ! -d "$PROJECT_DIR/node_modules/.bin" ]] && [[ -f "$PROJECT_DIR/package.json" ]]; then
+        echo "preflight: pnpm install (waiting for install lock)"
+        (
+          cd "$PROJECT_DIR"
+          exec 9>"$primary/.pnpm-install.lock"
+          flock 9
+          pnpm install --prefer-offline >/dev/null 2>&1 \
+            || echo "preflight: pnpm install failed (will surface in quality gates)"
+        )
+      fi
+    fi
+  fi
+  if [[ -n "$TARGET_ID" ]]; then
+    if ! pick_next_issue "$TARGET_ID" >/dev/null; then
+      echo "preflight FAIL: target '$TARGET_ID' not found or not ready-for-agent." >&2
+      exit 2
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 echo "========================================"
@@ -180,6 +264,102 @@ echo "Iterations: $MAX_ITER"
 [[ -n "$TARGET_ID" ]] && echo "Target: $TARGET_ID"
 echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "========================================"
+
+preflight
+
+# ---------------------------------------------------------------------------
+# Parallel mode: fan out all unblocked ready issues into worktrees, run one
+# `harness ralph --target X --once` per worktree, then merge done branches.
+# ponytail: shells out to this same script; no model picker / no inner loops.
+# ---------------------------------------------------------------------------
+if (( PARALLEL )); then
+  echo "Parallel mode: cap $PARALLEL_MAX concurrent"
+  [[ -n "$SCOPE_GLOB" ]] && echo "Scope: $SCOPE_GLOB"
+  SCAN_GLOB="${SCOPE_GLOB:-$ISSUES_GLOB}"
+  TARGETS=()
+  for f in $SCAN_GLOB; do
+    [[ -f "$f" ]] || continue
+    [[ "$(issue_status "$f")" == "ready-for-agent" ]] || continue
+    is_blocked "$f" && continue
+    TARGETS+=("$(issue_id "$f")")
+  done
+  if (( ${#TARGETS[@]} == 0 )); then
+    echo "No ready unblocked issues in scope. Nothing to do."
+    exit 0
+  fi
+  echo "Targets (${#TARGETS[@]}): ${TARGETS[*]}"
+  ORIG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  WT_ROOT="$PROJECT_DIR/.claude/worktrees"
+  mkdir -p "$WT_ROOT"
+  TS="$(date +%s)"
+  # macOS bash 3.2: parallel indexed arrays instead of associative.
+  P_PIDS=()
+  P_TARGETS=()
+  P_BRANCHES=()
+  P_WTS=()
+
+  spawn_one() {
+    local id="$1"
+    local wt="$WT_ROOT/ralph-$id-$TS"
+    local branch="ralph/parallel-$id-$TS"
+    git worktree add -b "$branch" "$wt" "$ORIG_BRANCH" >/dev/null 2>&1 || {
+      echo "  ✗ $id: worktree add failed" >&2
+      return 1
+    }
+    (
+      cd "$wt"
+      "$HARNESS_DIR/harness.sh" ralph --target "$id" --once > "$wt/.ralph.log" 2>&1
+    ) &
+    local pid=$!
+    P_PIDS+=("$pid")
+    P_TARGETS+=("$id")
+    P_BRANCHES+=("$branch")
+    P_WTS+=("$wt")
+    echo "  → $id [pid $pid]"
+  }
+
+  RUNNING=0
+  i=0
+  while (( i < ${#TARGETS[@]} )); do
+    if (( RUNNING < PARALLEL_MAX )); then
+      spawn_one "${TARGETS[$i]}" && ((RUNNING++))
+      ((i++))
+    else
+      wait -n 2>/dev/null || wait
+      ((RUNNING--))
+    fi
+  done
+  wait
+
+  echo
+  echo "── Parallel results ──"
+  echo
+  MERGED=()
+  FAILED=()
+  for idx in "${!P_PIDS[@]}"; do
+    target="${P_TARGETS[$idx]}"
+    branch="${P_BRANCHES[$idx]}"
+    wt="${P_WTS[$idx]}"
+    if grep -q "Success: " "$wt/.ralph.log" 2>/dev/null; then
+      if git merge --no-ff -m "ralph(parallel): merge $target" "$branch" >/dev/null 2>&1; then
+        echo "  ✓ $target  → merged $branch"
+        MERGED+=("$target")
+        git branch -D "$branch" >/dev/null 2>&1 || true
+      else
+        echo "  ⚠ $target  → merge conflict on $branch (left for manual resolution)"
+        FAILED+=("$target (merge conflict)")
+      fi
+    else
+      echo "  ✗ $target  → log: $wt/.ralph.log"
+      FAILED+=("$target")
+    fi
+  done
+
+  echo
+  echo "Merged: ${#MERGED[@]} | Failed: ${#FAILED[@]}"
+  (( ${#FAILED[@]} == 0 ))
+  exit $?
+fi
 
 # ---------------------------------------------------------------------------
 # Resolve orchestrator model
@@ -227,7 +407,55 @@ for ((i=1; i<=MAX_ITER; i++)); do
   OUTPUT_FILE="/tmp/ralph-output-$$.txt"
   : > "$OUTPUT_FILE"
 
-  PROMPT="You are the ORCHESTRATOR for ${PROJECT_NAME}. You are not a worker; you delegate.
+  # Parity-match protocol (only injected when mode=parity-match).
+  PARITY_BLOCK=""
+  if [[ "${HARNESS_MODE:-}" == "parity-match" ]]; then
+    if [[ -z "${PARITY_TARGET_URL:-}" ]]; then
+      echo "✗ HARNESS_MODE=parity-match but PARITY_TARGET_URL is unset." >&2
+      echo "  Run: harness match target <url>" >&2
+      exit 1
+    fi
+    ISSUE_DIR="$(dirname "$NEXT_ISSUE")"
+    AUDIT_FILE="${ISSUE_DIR}/../live-audits/${ISSUE_ID}.md"
+    mkdir -p "$(dirname "$AUDIT_FILE")"
+    PARITY_BLOCK="
+
+PARITY-MATCH PROTOCOL (BINDING — this is a clone/migration build):
+
+  Target site (the canonical reference we are matching):  ${PARITY_TARGET_URL}
+  Our build (for visual comparison only):                 ${PARITY_SOURCE_URL:-unset}
+  Live-audit file (write here BEFORE dispatching engineer): ${AUDIT_FILE}
+
+  Before ANY agent dispatch on this slice, you MUST run the live-audit step
+  yourself:
+
+  1. Identify the route for this issue (from the issue body or PRD). Open
+     \${PARITY_TARGET_URL}\${route} via the Chrome MCP (mcp__claude-in-chrome__*).
+  2. For every element named in the issue's acceptance criteria, extract the
+     actual CSS rule text from live — selector + declarations including the
+     var(--token) references. Use this probe pattern in javascript_tool:
+       const el = document.querySelector('<selector>');
+       const out = [];
+       for (const s of document.styleSheets) {
+         let rules; try { rules = s.cssRules } catch { continue }
+         for (const r of rules || []) {
+           if (r.selectorText && el.matches(r.selectorText)) out.push(r.cssText);
+         }
+       }
+       out.join('\\n\\n');
+     Do NOT rely on getComputedStyle — its resolved RGB values hide the
+     intended design token after cascade inheritance.
+  3. Write the extracted rules to ${AUDIT_FILE}, one section per element.
+  4. Only after the audit file exists with real content do you dispatch the
+     engineer. The engineer's prompt MUST include the path to this file as
+     binding context, and the engineer MUST cite a rule from it for each
+     code change.
+
+  Skip this protocol → the iteration fails the eval stage. No exceptions.
+"
+  fi
+
+  PROMPT="You are the ORCHESTRATOR for ${PROJECT_NAME}. You are not a worker; you delegate.${PARITY_BLOCK}
 
 OUTPUT DISCIPLINE: Be terse. No preamble, no recap, no narration. Output only what's load-bearing: tool calls and a final summary. Treat every token as scarce.
 
