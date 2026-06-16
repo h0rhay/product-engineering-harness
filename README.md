@@ -22,14 +22,45 @@ Each phase ends in an explicit sign-off gate; the Producer never collapses them 
 
 ## Install
 
+Two paths. Pick by intent.
+
+### User install (read-only consumer)
+
 ```bash
 git clone https://github.com/h0rhay/product-engineering-harness.git
 cd product-engineering-harness
-./install.sh            # copy into ~/.claude/ (use --link for live-edit maintainer mode)
+./install.sh            # copies agents + harness scripts into ~/.claude/
 source ~/.zshrc         # pick up the `harness` alias
 ```
 
-`install.sh` copies the agents and harness scripts into `~/.claude/`, adds the `harness` shell alias, and appends the Engineering Contract to `~/.claude/CLAUDE.md`. It then prints the prerequisite skills + design tooling to install (Vercel + Matt Pocock + Impeccable skills, Pencil CLI, SkillUI).
+`install.sh` copies files into `~/.claude/`, adds the `harness` alias, and appends the Engineering Contract to `~/.claude/CLAUDE.md`. To pick up upstream changes: `git pull && ./install.sh` again.
+
+### Maintainer install (live-edit + contribute upstream)
+
+If you want every edit you make under `~/.claude/harness/` to land back here as a PR (recommended for anyone who works on the harness):
+
+```bash
+git clone https://github.com/h0rhay/product-engineering-harness.git ~/Sites/product-engineering-harness
+rm -rf ~/.claude/harness                                                 # remove any prior vendor drop
+ln -s ~/Sites/product-engineering-harness/harness ~/.claude/harness      # symlink the install
+source ~/.zshrc
+```
+
+Now editing any file in `~/.claude/harness/` is editing the git checkout. The standard branch-first flow applies:
+
+```bash
+cd ~/Sites/product-engineering-harness
+git checkout main && git pull origin main
+git checkout -b feat/<change>
+# edit files; every edit is reflected in ~/.claude/harness/ instantly via the symlink
+git add -A && git commit -m "feat(...): ..."
+git push -u origin feat/<change>
+gh pr create --base main
+```
+
+When the PR merges, `git checkout main && git pull` brings the symlinked install back to mainline. No re-install needed.
+
+`install.sh --link` does the symlink wiring for you if you'd rather not do it by hand.
 
 ### Optional: statusline phase indicator
 
@@ -87,7 +118,8 @@ No marker means no segment, so your statusline is unchanged outside an active `p
         │   (full only)             (full only)    (always)       │  after gates)
         │
         └──> writes per-project config: .claude/harness.config.sh
-             writes issue layout:        .scratch/<feature>/{PRD.md, issues/}, docs/agents/
+             writes issue layout:        issues/<feature>/, docs/prds/<feature>.md, docs/agents/
+             scratch (gitignored):       .scratch/ for genuine cruft only (captures, dumps)
 ```
 
 The orchestrator does not implement; it delegates. Each specialist owns a narrow job. Reviewer is read-only and emits a structured JSON eval. Specialists never call each other directly: routing always goes through the orchestrator.
@@ -97,16 +129,27 @@ The orchestrator does not implement; it delegates. Each specialist owns a narrow
 ## Commands (every one)
 
 ```
-harness init                  Bootstrap current project (.claude/, .scratch/, docs/agents/, CLAUDE.md block)
+harness init                  Bootstrap current project (.claude/, issues/, docs/, CLAUDE.md block)
 harness ralph [N]             Run autonomous loop, N iterations (default 10)
 harness ralph --once          Single iteration with verbose output
 harness ralph --target ID     Run against one specific issue (filename stem)
+harness ralph --parallel      Fan out unblocked ready issues into git worktrees, run concurrently
+harness ralph --scope GLOB    Restrict --parallel to one PRD, e.g. "issues/parity-cta-restore/*.md"
+harness ralph --merge-ready   Sweep ralph/parallel-* branches whose issue is Status: done; merge locally
 harness status                Show backlog: ready, blocked, done counts + current mode
 harness mode <poc|full>       Set HARNESS_MODE
 harness design <on|off>       Set DESIGN_PHASE
 harness graduate              Shortcut: mode=full + design=on (ready-for-prod)
 harness help                  Show all of the above
 ```
+
+### Parallel mode notes
+
+- Spawns at most `RALPH_PARALLEL_MAX` worktrees (default 4) under `<project>/.claude/worktrees/`.
+- Each worktree gets its own `pnpm install`, serialized via a mkdir-based lock so parallel installs don't corrupt pnpm's content store.
+- Singleton-resource quality checks (e.g. a Playwright dev server on a fixed port) should be wrapped with `~/.claude/harness/with-lock.sh <lock-dir> <cmd>` inside `QUALITY_CHECKS` so only one worktree runs them at a time. `with-lock.sh` is a portable mkdir mutex (macOS has no `flock`).
+- `export CI=true` is set at the top of `ralph.sh` so pnpm never blocks on TTY confirmation in any subprocess.
+- On success a worktree's branch (`ralph/parallel-<id>-<ts>`) is left in place. `--merge-ready` folds passing branches back into the branch you invoked from. No auto-push; raise the resulting branch as a PR yourself, or run the per-slice PR sweep (TODO flag).
 
 All commands operate on the current working directory's `.claude/harness.config.sh`. The global scripts live at `~/.claude/harness/` and are invoked via the `harness` shell alias (sourced from `~/.zshrc`).
 
@@ -215,15 +258,16 @@ QUALITY_CHECKS=(
   "pnpm test -- --run"
   "pnpm typecheck"
   "pnpm build"
-  "pnpm test:e2e"   # E2E gate — drives the built app; required for UI projects
+  # Singleton-port E2E wrapped in with-lock so parallel worktrees don't fight for port 4321.
+  "~/.claude/harness/with-lock.sh /tmp/<project>-e2e.lock pnpm test:e2e"
 )
 
 CONTEXT_FILES=(
   "docs/rules.md"
-  ".scratch/todo-app/PRD.md"
+  "docs/prds/todo-app.md"
 )
 
-ISSUES_GLOB=".scratch/*/issues/*.md"
+ISSUES_GLOB="issues/*/*.md"
 
 HARNESS_MODE="poc"
 DESIGN_PHASE="disabled"
@@ -243,7 +287,7 @@ esac
 
 ## Issue file format
 
-Plain markdown under `.scratch/<feature>/issues/<NN>-<slug>.md`:
+Plain markdown under `issues/<feature>/<NN>-<slug>.md` (tracked in git, so worktrees and parallel runs see them natively). PRDs live alongside under `docs/prds/<feature>.md`:
 
 ```markdown
 # 03 — delete a todo
@@ -276,8 +320,8 @@ Ralph picks the lowest-Priority `ready-for-agent` issue with no unresolved `Bloc
 cd ~/Sites/MyApp
 harness init                         # bootstrap; ends in poc mode, design off
 /grill-with-docs                     # 20 minutes of focused interview
-/to-prd                              # synthesises .scratch/<feature>/PRD.md
-/to-issues                           # vertical slices into .scratch/<feature>/issues/*.md
+/to-prd                              # synthesises docs/prds/<feature>.md
+/to-issues                           # vertical slices into issues/<feature>/*.md
 harness status                       # confirm what's ready
 ```
 
@@ -368,9 +412,12 @@ After `./install.sh`, the layout under `~/.claude/`:
 │   ├── harness-init.sh                            # project bootstrap
 │   ├── harness-status.sh                          # backlog summary
 │   ├── harness-toggle.sh                          # mode / design / graduate
-│   ├── ralph.sh                                   # autonomous loop
+│   ├── harness-match.sh                           # parity-match mode (clone / migration / rebrand)
+│   ├── harness-watch.sh                           # heartbeat for background ralph runs
+│   ├── ralph.sh                                   # autonomous loop (incl. --parallel)
 │   ├── ralph-progress.sh                          # stream-json progress renderer
-│   └── eval-stage.sh                              # reviewer dispatch + JSON emit
+│   ├── eval-stage.sh                              # reviewer dispatch + JSON emit
+│   └── with-lock.sh                               # portable mkdir mutex (macOS has no flock)
 ├── skills/                                        # installed skills (Anthropic + Vercel + community)
 │   ├── _install-skill.sh                          # `~/.claude/skills/_install-skill.sh <github-tree-url>`
 │   ├── impeccable/                                # primary design system
@@ -381,21 +428,23 @@ After `./install.sh`, the layout under `~/.claude/`:
 
 <project-root>/                                    # in each project after `harness init`
 ├── .claude/harness.config.sh                      # per-project flags + binding rules
-├── .scratch/<feature>/
-│   ├── PRD.md                                     # output of /to-prd
-│   ├── issues/<NN>-<slug>.md                      # output of /to-issues
-│   ├── issues/<NN>-<slug>.eval.json               # reviewer eval
-│   ├── direction/<NN>-<slug>.md                   # art-director output
-│   └── design/                                    # designer output
-│       ├── <NN>-<slug>.pen                        # Pencil source
-│       ├── <NN>-<slug>-handoff.md                 # engineer-facing
-│       ├── <NN>-<slug>.prompt.md                  # what Pencil's agent received
-│       ├── <NN>-pencil-agent.log                  # CLI run log
-│       ├── screenshots/<NN>-pencil-<frame>.png
-│       └── skills/<ref-name>/                     # SkillUI output (gitignored, regenerable)
+├── .claude/worktrees/                             # parallel ralph worktrees (gitignored)
+├── issues/<feature>/                              # TRACKED in git
+│   ├── <NN>-<slug>.md                             # output of /to-issues (Status / Priority / Blocked-by)
+│   └── <NN>-<slug>.eval.json                      # reviewer eval (per slice)
+├── docs/prds/<feature>.md                         # TRACKED — output of /to-prd
 ├── docs/agents/{issue-tracker,triage-labels,domain}.md   # Matt Pocock conventions, with our defaults
+├── docs/rules.md                                  # binding rules (Tailwind-only, no inline style, etc.)
 ├── CONTEXT.md                                     # populated lazily by /grill-with-docs
-└── docs/rules.md                                  # binding rules (Tailwind-only, no inline style, etc.)
+└── .scratch/<feature>/                            # GITIGNORED — genuine cruft only
+    ├── direction/<NN>-<slug>.md                   # art-director output (regenerable)
+    └── design/                                    # designer output (regenerable)
+        ├── <NN>-<slug>.pen                        # Pencil source
+        ├── <NN>-<slug>-handoff.md                 # engineer-facing
+        ├── <NN>-<slug>.prompt.md                  # what Pencil's agent received
+        ├── <NN>-pencil-agent.log                  # CLI run log
+        ├── screenshots/<NN>-pencil-<frame>.png
+        └── skills/<ref-name>/                     # SkillUI output (regenerable)
 ```
 
 ---
@@ -412,7 +461,19 @@ After `./install.sh`, the layout under `~/.claude/`:
 
 ---
 
-## Validated this session
+## Validated in real projects
+
+### vcc-migration (Webflow → Astro + Storyblok migration, 2026-06)
+
+The harness drove a parity-restoration PRD (homepage + marketing-page CTA buttons) using the new parallel mode. What this session proved:
+
+1. **`harness ralph --parallel --scope "issues/<feature>/*.md"`** fans out unblocked ready issues into git worktrees and runs them concurrently. Wall-clock drops with parallelism; each slice still gets a full quality-gate pass (lint / typecheck / test / build / parity-gate) inside its worktree.
+2. **Tracked issues at `issues/<feature>/*.md` survive worktrees natively.** Removing the gitignore on the task tracker eliminated a whole class of "issue file missing in worktree" bugs that earlier band-aids tried to paper over with rsync.
+3. **`with-lock.sh` serializes singleton resources.** Wrapping the parity-gate Playwright run (binds port 4321) in `with-lock.sh /tmp/<project>-parity.lock` lets the rest of the gate (lint / typecheck / test / build) run truly in parallel across worktrees, while only the port-bound step queues.
+4. **Symlinked install picks up upstream changes by `git pull`.** With `~/.claude/harness → ~/Sites/product-engineering-harness/harness`, the same `git checkout main && git pull` flow that updates any repo updates the global install. No re-install step.
+5. **`export CI=true` at the top of `ralph.sh`** propagates to every subprocess so `pnpm install` never blocks on TTY confirmation in worktrees, CI, or background runs.
+
+### TodoTest (smoke-test app, earlier session)
 
 The harness ran 8 slices end-to-end on a smoke-test app (`h0rhay/TodoTest`, private). Specifically validated:
 
@@ -435,6 +496,8 @@ The harness ran 8 slices end-to-end on a smoke-test app (`h0rhay/TodoTest`, priv
 
 ### Nice-to-haves not yet built
 
+- **Per-slice PR raising in `--parallel`.** Today a successful parallel run merges into the invoking branch locally. A `--raise-prs` flag would push each `ralph/parallel-*` branch and `gh pr create` against the base instead. Useful when slices should reviewed/merged independently rather than piled into one feature PR.
+- **`harness sync`** — diff `~/.claude/harness/` against PEH `origin/main`, offer to branch + commit + PR uncommitted local edits. The maintainer install pattern makes this trivial once you remember to do it; a subcommand would prevent drift like this README's.
 - **`harness mockup <slice-id>`** — one-shot dispatch of just the design phase against a specific issue (skip the rest). Useful for iterating on a mockup without re-running engineering.
 - **`harness graduate` should commit the config edit.** Currently it leaves the change uncommitted. Could optionally take a `--commit` flag.
 - **Pencil `.pen` files don't open in app automatically when composed via CLI Agent Mode.** Designer.md was updated this session to run `open <path>.pen` as a step, but that's a manual hook; would be cleaner if Pencil CLI had a `--open` flag.
