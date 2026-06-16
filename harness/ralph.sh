@@ -238,8 +238,9 @@ preflight() {
         echo "preflight: pnpm install (waiting for install lock)"
         (
           cd "$PROJECT_DIR"
-          exec 9>"$primary/.pnpm-install.lock"
-          flock 9
+          LOCK="$primary/.pnpm-install.lock.d"
+          while ! mkdir "$LOCK" 2>/dev/null; do sleep 1; done
+          trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
           pnpm install --prefer-offline >/dev/null 2>&1 \
             || echo "preflight: pnpm install failed (will surface in quality gates)"
         )
