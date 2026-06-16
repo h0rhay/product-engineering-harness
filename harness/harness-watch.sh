@@ -1,20 +1,29 @@
 #!/usr/bin/env bash
 # harness watch — terse heartbeat for background ralph runs.
-# Scans /tmp/ralph-*.log + harness-ralph-*.log. One line per run.
-# Detects silent death: process gone, log not ending with "Ralph finished".
+# Scans /tmp/ralph-*.log + per-project .claude/worktrees/*/.ralph.log
+# (parallel-mode worktrees). One line per run. Detects silent death.
 
 set -uo pipefail
 
 shopt -s nullglob
 logs=(/tmp/ralph-*.log /tmp/harness-ralph-*.log)
+# Also pick up parallel-mode worktree logs in the current project.
+if [[ -d .claude/worktrees ]]; then
+  logs+=(.claude/worktrees/*/.ralph.log)
+fi
 if [[ ${#logs[@]} -eq 0 ]]; then
-  echo "no ralph logs in /tmp"
+  echo "no ralph logs in /tmp or .claude/worktrees"
   exit 0
 fi
 
 now=$(date '+%H:%M:%S')
 for log in "${logs[@]}"; do
-  name=$(basename "$log" .log)
+  # Worktree logs live at <wt>/.ralph.log — use parent dir name. Others use file stem.
+  if [[ "$(basename "$log")" == ".ralph.log" ]]; then
+    name=$(basename "$(dirname "$log")")
+  else
+    name=$(basename "$log" .log)
+  fi
   last=$(tail -1 "$log" 2>/dev/null | tr -d '\r')
   finished=0
   grep -q "^Ralph finished" "$log" 2>/dev/null && finished=1
