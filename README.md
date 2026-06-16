@@ -137,11 +137,38 @@ harness ralph --parallel      Fan out unblocked ready issues into git worktrees,
 harness ralph --scope GLOB    Restrict --parallel to one PRD, e.g. "issues/parity-cta-restore/*.md"
 harness ralph --merge-ready   Sweep ralph/parallel-* branches whose issue is Status: done; merge locally
 harness status                Show backlog: ready, blocked, done counts + current mode
+harness watch                 Terse heartbeat: one line per in-flight or completed ralph run
+harness match <sub>           Parity-match mode (clone / migration / rebrand)
 harness mode <poc|full>       Set HARNESS_MODE
 harness design <on|off>       Set DESIGN_PHASE
 harness graduate              Shortcut: mode=full + design=on (ready-for-prod)
 harness help                  Show all of the above
 ```
+
+### Heartbeat protocol (visibility during long parallel runs)
+
+Background ralph runs are silent by default. `harness watch` solves that.
+
+```bash
+harness watch
+# [18:09:01] ralph-extract-modern-slavery-1781629668 · live   5s · Picked
+# [18:09:01] ralph-close-wontfix-404s-1781629668     · live   5s · Picked
+# [18:09:01] ralph-carousels                         · DONE · verdict: pass
+# [18:08:27] ralph-doc-fallback                      · DIED · ELIFECYCLE Test failed
+```
+
+One line per run. Three states: `DONE` (with verdict / duration), `DIED` (process gone, log doesn't end with "Ralph finished"; surfaces the last error), or `live Ns` (still going, with seconds-since-last-activity and current stage).
+
+Scans both `/tmp/ralph-*.log` (serial runs) and `<project>/.claude/worktrees/*/.ralph.log` (parallel runs).
+
+When driving the harness from Claude Code, the agent should:
+
+1. Pre-flight validation: `harness ralph --target ID` exits non-zero fast if the issue is missing or the worktree is misconfigured. Catch failures within seconds, not hours.
+2. Schedule a `ScheduleWakeup` every 270s while any run is live. Each tick runs `harness watch` and surfaces status to the user.
+3. Detect silent death immediately: `harness watch` reports `DIED` when the process is gone but the log doesn't end with the success marker.
+4. Stop the wakeup chain when all runs are `DONE` or `DIED`.
+
+The full protocol with rationale is in [`harness/LESSONS.md`](harness/LESSONS.md).
 
 ### Parallel mode notes
 
