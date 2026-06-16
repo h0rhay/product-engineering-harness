@@ -6,4 +6,8 @@ set -euo pipefail
 LOCK="$1"; shift
 while ! mkdir "$LOCK" 2>/dev/null; do sleep 1; done
 trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
-exec "$@"
+set +e
+"$@"
+status=$?
+set -e
+exit "$status"
