@@ -89,8 +89,8 @@ CONTEXT_FILES=(
   "docs/rules.md"
 )
 
-# Where to find issues. Matt Pocock's local-markdown convention.
-ISSUES_GLOB=".scratch/*/issues/*.md"
+# Where to find issues. Tracked markdown files, one per slice.
+ISSUES_GLOB="issues/*/*.md"
 
 # Specialist agents the orchestrator may dispatch. Two flags compose the set:
 #

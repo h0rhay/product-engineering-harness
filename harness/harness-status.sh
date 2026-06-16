@@ -15,7 +15,7 @@ fi
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
-ISSUES_GLOB="${ISSUES_GLOB:-.scratch/*/issues/*.md}"
+ISSUES_GLOB="${ISSUES_GLOB:-issues/*/*.md}"
 
 c_ready=0
 c_human=0
