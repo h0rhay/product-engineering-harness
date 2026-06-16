@@ -32,6 +32,8 @@ Mode flags (per-project, edits .claude/harness.config.sh):
   harness mode <poc|full>       Set HARNESS_MODE (full adds devops + security)
   harness design <on|off>       Set DESIGN_PHASE (on adds art-director + designer)
   harness graduate              Shortcut: mode=full + design=on (ready-for-prod)
+  harness watch                 Terse heartbeat: one line per in-flight or completed ralph run
+  harness match <sub>           Parity-match mode (clone / migration / rebrand)
 
   harness help                  This message
 
@@ -52,6 +54,8 @@ case "$cmd" in
   mode)            exec "$HARNESS_DIR/harness-toggle.sh" mode "$@" ;;
   design)          exec "$HARNESS_DIR/harness-toggle.sh" design "$@" ;;
   graduate)        exec "$HARNESS_DIR/harness-toggle.sh" graduate "$@" ;;
+  watch)           exec "$HARNESS_DIR/harness-watch.sh" "$@" ;;
+  match)           exec "$HARNESS_DIR/harness-match.sh" "$@" ;;
   help|--help|-h)  usage ;;
   *)
     echo "Unknown command: $cmd" >&2

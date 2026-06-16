@@ -137,11 +137,34 @@ harness ralph --parallel      Fan out unblocked ready issues into git worktrees,
 harness ralph --scope GLOB    Restrict --parallel to one PRD, e.g. "issues/parity-cta-restore/*.md"
 harness ralph --merge-ready   Sweep ralph/parallel-* branches whose issue is Status: done; merge locally
 harness status                Show backlog: ready, blocked, done counts + current mode
+harness watch                 Terse heartbeat: one line per in-flight or completed ralph run
+harness match <sub>           Parity-match mode (clone / migration / rebrand)
 harness mode <poc|full>       Set HARNESS_MODE
 harness design <on|off>       Set DESIGN_PHASE
 harness graduate              Shortcut: mode=full + design=on (ready-for-prod)
 harness help                  Show all of the above
 ```
+
+### Heartbeat protocol (visibility during long parallel runs)
+
+Background ralph runs are silent by default. `harness watch` solves that.
+
+```bash
+harness watch
+# [18:09:01] ralph-extract-modern-slavery-1781629668 · live   5s · Picked
+# [18:09:01] ralph-close-wontfix-404s-1781629668     · live   5s · Picked
+# [18:09:01] ralph-carousels                         · DONE · verdict: pass
+# [18:08:27] ralph-doc-fallback                      · DIED · ELIFECYCLE Test failed
+```
+
+One line per run. Three states: `DONE` (verdict + duration), `DIED` (process gone, log doesn't end with "Ralph finished"; surfaces the last error), `live Ns` (still going, seconds-since-last-activity + current stage). Scans both `/tmp/ralph-*.log` and `<project>/.claude/worktrees/*/.ralph.log`.
+
+When driving the harness from Claude Code, follow the four-point protocol from [`harness/LESSONS.md`](harness/LESSONS.md):
+
+1. **Pre-flight validation.** `harness ralph --target ID` exits non-zero fast if the issue is missing or worktree misconfigured. Catch failures in seconds, not hours.
+2. **`ScheduleWakeup` every 270s while any run is live.** Each tick runs `harness watch` and surfaces status to the user.
+3. **Detect silent death immediately.** `harness watch` reports `DIED` when the process is gone but the log doesn't end with the success marker.
+4. **Stop the chain when all `DONE`/`DIED`.** No idle ticks.
 
 ### Parallel mode notes
 
