@@ -51,7 +51,10 @@ fi
 # its own helper at scripts/<system>/.
 # ---------------------------------------------------------------------------
 DEFAULTS=(
+  # Schema-shape mutations — wipe component fields if PUT partially.
   "storyblok-schema:scripts/storyblok/update-component-schema.ts:mapi.storyblok.com/v[0-9]+/spaces/[0-9]+/components:PUT|POST|DELETE"
+  # Story / row content mutations — wipe row fields if PUT partially. Same bug, different surface.
+  "storyblok-story:scripts/storyblok/update-story-content.ts:mapi.storyblok.com/v[0-9]+/spaces/[0-9]+/stories:PUT|POST|DELETE"
   "strapi-content-type:scripts/strapi/update-content-type.ts:/admin/content-type-builder|/admin/content-types:PUT|POST|DELETE"
   "prismic-custom-type:scripts/prismic/update-custom-type.ts:customtypes\\.prismic\\.io:PUT|POST|DELETE"
   "sanity-schema:scripts/sanity/update-schema.ts:api\\.sanity\\.io/v[0-9]+/.+/schemas:PUT|POST|DELETE"
@@ -95,7 +98,6 @@ case "$tool" in
     ;;
   mcp__*__execute_mutating)
     mcp_op="$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_input",{}).get("parameters",{}).get("operation",""))' 2>/dev/null || true)"
-    # Block known schema-shape mutations across CMSes.
     case "$mcp_op" in
       updateComponent|deleteComponent|createComponent|updateComponentGroup|deleteComponentGroup|\
       updateContentType|deleteContentType|createContentType|\
@@ -104,6 +106,13 @@ case "$tool" in
         printf '\n[data-write-guard] BLOCKED: MCP %s is a schema-shape mutation.\n' "$mcp_op" >&2
         printf '[data-write-guard] Route schema edits through a project helper that does GET → merge → PUT.\n' >&2
         printf '[data-write-guard] If no helper exists yet, copy the appropriate template from:\n' >&2
+        printf '  %s\n' "$HOME/.claude/harness/templates/" >&2
+        exit 2
+        ;;
+      updateStory|updateEntry|updateDocument|updateRecord)
+        printf '\n[data-write-guard] BLOCKED: MCP %s is a row-content mutation.\n' "$mcp_op" >&2
+        printf '[data-write-guard] Partial-payload PUTs wipe sibling fields. Route through a project helper that does GET → merge → PUT.\n' >&2
+        printf '[data-write-guard] If no helper exists yet, copy from:\n' >&2
         printf '  %s\n' "$HOME/.claude/harness/templates/" >&2
         exit 2
         ;;

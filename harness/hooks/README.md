@@ -68,3 +68,11 @@ Templates live in `~/.claude/harness/templates/`. Copy one to
 `scripts/<system>/update-*.ts` and adapt the API constants. The template
 enforces GET → merge → PUT and refuses to delete fields still referenced
 in `src/` without `--force-delete`.
+
+### What it now covers (June 2026 update)
+
+After two consecutive wipe incidents — first the `item-category` schema, then the gold/jewellery/watches **story content** — the guard treats schema-shape mutations and row-content mutations the same. Both routes (PUT to `/components/*` and PUT to `/stories/*`) have the same partial-payload bug. Both must go through a helper that does GET → merge → PUT.
+
+MCP operations blocked: `updateComponent`, `updateContentType`, `updateCustomType`, `updateSchema`, `updateStory`, `updateEntry`, `updateDocument`, `updateRecord` (and their delete/create variants).
+
+Templates: `update-component-schema.template.ts` (schema) + `update-row-content.template.ts` (row/story/document content). Each enforces critical-field assertions and refuses to delete fields still referenced in `src/` without `--force-delete`.
