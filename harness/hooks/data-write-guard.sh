@@ -29,6 +29,21 @@
 
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# Branded output. Every harness hook should use this banner so blocks are
+# instantly recognisable as "your harness, not Claude/system noise".
+# Args: $1 hook-name  $2 headline  $3 why  $4 fix  $5 override-hint
+# ---------------------------------------------------------------------------
+peh_block() {
+  printf '\n══ [[PEH]] %s ═══════════════════════════════════════════════════════\n' "$1" >&2
+  printf '   This block is from YOUR product engineering harness, not Claude.\n' >&2
+  printf '   BLOCKED: %s\n' "$2" >&2
+  [[ -n "${3:-}" ]] && printf '   Why:      %s\n' "$3" >&2
+  [[ -n "${4:-}" ]] && printf '   Fix:      %s\n' "$4" >&2
+  [[ -n "${5:-}" ]] && printf '   Override: %s\n' "$5" >&2
+  printf '════════════════════════════════════════════════════════════════════════\n\n' >&2
+}
+
 payload="$(cat)"
 tool="$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_name",""))' 2>/dev/null || true)"
 
@@ -96,8 +111,11 @@ case "$tool" in
     if [[ "${DATA_WRITE_ALLOW_DESTRUCTIVE:-0}" == "1" ]]; then
       exit 0
     fi
-    printf '\n[data-write-guard] BLOCKED: %s is destructive.\n' "$tool" >&2
-    printf '[data-write-guard] If this is an intentional delete the human asked for, re-run with DATA_WRITE_ALLOW_DESTRUCTIVE=1.\n' >&2
+    peh_block "data-write-guard" \
+      "$tool is a destructive MCP op" \
+      "Destructive ops can wipe state irreversibly." \
+      "Confirm the intent with the human, then re-run." \
+      "DATA_WRITE_ALLOW_DESTRUCTIVE=1 (per-call) if this is the deliberate delete that was asked for."
     exit 2
     ;;
   mcp__*__execute_mutating)
@@ -108,17 +126,19 @@ case "$tool" in
       updateContentType|deleteContentType|\
       updateCustomType|deleteCustomType|\
       updateSchema|deleteSchema)
-        printf '\n[data-write-guard] BLOCKED: MCP %s is a schema-shape mutation.\n' "$mcp_op" >&2
-        printf '[data-write-guard] Route schema edits through a project helper that does GET → merge → PUT.\n' >&2
-        printf '[data-write-guard] If no helper exists yet, copy the appropriate template from:\n' >&2
-        printf '  %s\n' "$HOME/.claude/harness/templates/" >&2
+        peh_block "data-write-guard" \
+          "MCP $mcp_op is a schema-shape mutation" \
+          "Partial-payload writes wipe fields that aren't in the payload." \
+          "Use the project's schema helper (GET → merge → PUT). Template: ~/.claude/harness/templates/update-component-schema.template.ts" \
+          "(none — schema edits must go through a helper)"
         exit 2
         ;;
       updateStory|updateEntry|updateDocument|updateRecord)
-        printf '\n[data-write-guard] BLOCKED: MCP %s is a row-content mutation.\n' "$mcp_op" >&2
-        printf '[data-write-guard] Partial-payload PUTs wipe sibling fields. Route through a project helper that does GET → merge → PUT.\n' >&2
-        printf '[data-write-guard] If no helper exists yet, copy from:\n' >&2
-        printf '  %s\n' "$HOME/.claude/harness/templates/" >&2
+        peh_block "data-write-guard" \
+          "MCP $mcp_op is a row-content mutation" \
+          "Partial-payload PUTs wipe sibling fields. Burned us 3× in 48h on Storyblok." \
+          "Use the project's row helper (GET → merge → PUT). Template: ~/.claude/harness/templates/update-row-content.template.ts" \
+          "(none — row writes must go through a helper)"
         exit 2
         ;;
     esac
@@ -151,11 +171,11 @@ for rule in "${RULES[@]}"; do
       if printf '%s' "$cmd" | grep -Eq "(^|[[:space:]&|;])$RUNNERS[[:space:]]+([^&|;]*[[:space:]])?${helper_re}([[:space:]&|;]|$)"; then
         continue
       fi
-      printf '\n[data-write-guard] BLOCKED [%s]: direct destructive write to %s.\n' "$label" "$hostpat" >&2
-      printf '[data-write-guard] Use the project helper (GET → embellish → PUT):\n' >&2
-      printf '  %s\n' "$helper" >&2
-      printf '[data-write-guard] If the helper does not exist yet, scaffold it from:\n' >&2
-      printf '  %s\n' "$HOME/.claude/harness/templates/" >&2
+      peh_block "data-write-guard" \
+        "direct destructive write to $label endpoint" \
+        "Bash hit $hostpat with a mutating method. Partial payloads wipe fields." \
+        "Run the helper: $helper (GET → merge → PUT). Templates: ~/.claude/harness/templates/" \
+        "(none — invoke the helper, or add a new rule in DATA_WRITE_HELPERS)"
       exit 2
     fi
   fi
@@ -165,9 +185,11 @@ done
 if printf '%s' "$cmd" | grep -Eq '(^|/| )(scripts|tools|bin)/(backfill|load|seed|migrate)[^[:space:]]*\.(ts|js|mjs|py|sh)'; then
   if ! printf '%s' "$cmd" | grep -qE 'scripts/(storyblok|strapi|prismic|sanity|supabase|convex)/'; then
     if [[ "${DATA_WRITE_ALLOW_ADHOC:-0}" != "1" ]]; then
-      printf '\n[data-write-guard] BLOCKED: ad-hoc backfill/load script.\n' >&2
-      printf '[data-write-guard] Route writes through a system-specific helper under scripts/<system>/.\n' >&2
-      printf '[data-write-guard] If this script is content-only and safe, set DATA_WRITE_ALLOW_ADHOC=1 in the call.\n' >&2
+      peh_block "data-write-guard" \
+        "ad-hoc backfill/load/seed/migrate script" \
+        "Ad-hoc scripts bypass the GET → merge → PUT helper pattern." \
+        "Move the logic into scripts/<system>/ alongside the system-specific helper." \
+        "DATA_WRITE_ALLOW_ADHOC=1 (per-call) if this script is content-only and safe."
       exit 2
     fi
   fi
