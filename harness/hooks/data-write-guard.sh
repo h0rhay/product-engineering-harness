@@ -29,20 +29,11 @@
 
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# Branded output. Every harness hook should use this banner so blocks are
-# instantly recognisable as "your harness, not Claude/system noise".
-# Args: $1 hook-name  $2 headline  $3 why  $4 fix  $5 override-hint
-# ---------------------------------------------------------------------------
-peh_block() {
-  printf '\n══ [[PEH]] %s ═══════════════════════════════════════════════════════\n' "$1" >&2
-  printf '   This block is from YOUR product engineering harness, not Claude.\n' >&2
-  printf '   BLOCKED: %s\n' "$2" >&2
-  [[ -n "${3:-}" ]] && printf '   Why:      %s\n' "$3" >&2
-  [[ -n "${4:-}" ]] && printf '   Fix:      %s\n' "$4" >&2
-  [[ -n "${5:-}" ]] && printf '   Override: %s\n' "$5" >&2
-  printf '════════════════════════════════════════════════════════════════════════\n\n' >&2
-}
+# Shared PEH banner output (peh_block).
+_peh_lib="${PEH_LIB:-$HOME/.claude/harness/hooks/_peh.sh}"
+[[ -r "$_peh_lib" ]] || _peh_lib="$(dirname "$0")/_peh.sh"
+# shellcheck source=/dev/null
+source "$_peh_lib"
 
 payload="$(cat)"
 tool="$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_name",""))' 2>/dev/null || true)"

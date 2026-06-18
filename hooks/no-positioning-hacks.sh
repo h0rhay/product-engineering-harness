@@ -5,6 +5,12 @@
 # fine — and must say so with a citation comment (cite: <source>).
 # Exit 2 = block; stderr is shown to the agent.
 
+# Shared PEH banner output (peh_block).
+_peh_lib="${PEH_LIB:-$HOME/.claude/harness/hooks/_peh.sh}"
+[[ -r "$_peh_lib" ]] || _peh_lib="$(dirname "$0")/../harness/hooks/_peh.sh"
+# shellcheck source=/dev/null
+source "$_peh_lib"
+
 input=$(cat)
 tool=$(echo "$input" | jq -r '.tool_name // empty')
 [[ "$tool" =~ ^(Write|Edit|MultiEdit)$ ]] || exit 0
@@ -25,25 +31,11 @@ if echo "$content" | grep -qE "$PATTERN"; then
   # Citation escape hatch: the SAME edit must say why this is the
   # library's/spec's own pattern, e.g.  /* cite: radix navigation-menu docs */
   if ! echo "$content" | grep -qiE '(cite:|per (radix|spec|capture|class-map|live probe))'; then
-    cat >&2 <<'MSG'
-BLOCKED by no-positioning-hacks hook (docs/rules.md: "Work with the library").
-
-This edit contains brute-force positioning (magic px offsets / z-index
-inflation / transform nudges / !important position overrides). These are
-how library-fighting workarounds look, and they are forbidden.
-
-Before reaching for positioning:
-1. Read the library's docs for the component's INTENDED layout mechanism
-   (e.g. Radix NavigationMenu: per-trigger anchoring = no Viewport,
-   Content inside a relative Item — not viewport offset hacks).
-2. If the intended mechanism genuinely requires this positioning, keep it
-   AND add a citation in the same edit, e.g.:
-     /* cite: radix navigation-menu — content anchors in relative item */
-     /* cite: live probe — source uses fixed 48px cell padding at 1440 */
-3. If you are overriding a library's own positioning because it "renders
-   in the wrong place" — STOP. That is the bug to understand, not paint
-   over. Escalate in your report instead of hacking around it.
-MSG
+    peh_block "no-positioning-hacks" \
+      "brute-force positioning in UI code (docs/rules.md: \"Work with the library\")" \
+      "Magic px offsets / z-index inflation / transform nudges / !important position overrides are how library-fighting workarounds look." \
+      "Read the library's docs for the INTENDED layout mechanism. If the library's own pattern genuinely needs this position, keep it AND add a citation in the same edit (e.g. /* cite: radix navigation-menu docs */). If you're overriding a library's positioning because it \"renders wrong\", that is the bug to understand — not paint over." \
+      "(none — add a 'cite:' comment in the same edit if this IS the library's documented pattern)"
     exit 2
   fi
 fi

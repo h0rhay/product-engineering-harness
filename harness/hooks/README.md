@@ -2,6 +2,34 @@
 
 Reusable PreToolUse hooks for projects driven by the product engineering harness.
 
+## Branded output (`_peh.sh`)
+
+Every harness hook sources `_peh.sh` and emits blocks via `peh_block`. The
+shared banner makes blocks instantly recognisable as harness-driven (not
+generic system noise the agent will gloss over):
+
+```
+══ [[PEH]] <hook-name> ════════════════════════════════════════════════
+   This block is from the product engineering harness.
+   BLOCKED: <headline>
+   Why:      <one-line reason>
+   Fix:      <what to do instead>
+   Override: <per-call env var, or "(none)">
+════════════════════════════════════════════════════════════════════════
+```
+
+Adding a new hook? Source the library at the top:
+
+```sh
+_peh_lib="${PEH_LIB:-$HOME/.claude/harness/hooks/_peh.sh}"
+[[ -r "$_peh_lib" ]] || _peh_lib="$(dirname "$0")/_peh.sh"
+source "$_peh_lib"
+
+# ...later, when blocking:
+peh_block "my-hook" "<headline>" "<why>" "<fix>" "<override-hint>"
+exit 2
+```
+
 ## `data-write-guard.sh`
 
 Blocks direct destructive writes (PUT/POST/DELETE/PATCH) to CMS / database admin endpoints, forcing all schema-shape edits through a project-owned helper that performs `GET → embellish → PUT`.
