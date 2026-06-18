@@ -76,19 +76,38 @@ Sanity schemas, Supabase admin, Convex schema/admin. Disable with
 
 ### What it blocks
 
-- MCP `execute_destructive` (any).
-- MCP `execute_mutating` whose `operation` is a known schema-shape mutation
-  (`updateComponent`, `updateContentType`, `updateCustomType`, `updateSchema`, …).
-- Bash commands hitting a registered hostname/pattern with PUT/POST/DELETE/PATCH
-  unless the command invokes the project helper.
+- MCP `execute_destructive` (any). Override per-call with
+  `DATA_WRITE_ALLOW_DESTRUCTIVE=1` for the deliberate-delete case.
+- MCP `execute_mutating` with a schema-shape **update/delete**
+  (`updateComponent`, `deleteComponent`, `updateContentType`, `updateCustomType`,
+  `updateSchema`, …). Creates are NOT blocked (nothing to wipe).
+- MCP `execute_mutating` with a row-content **update**
+  (`updateStory`, `updateEntry`, `updateDocument`, `updateRecord`).
+- Bash commands hitting a registered hostname/pattern with a mutating method
+  unless the command invokes the project helper as an executable. Mutating
+  method = explicit `-X PUT|POST|DELETE|PATCH` / `--request …` / `method: '…'`,
+  OR body-bearing curl flags that imply a write (`-d`, `--data*`, `-T`,
+  `--upload-file`).
 - Ad-hoc `scripts/(backfill|load|seed|migrate)*.ts` outside the
   `scripts/<system>/` convention. Bypass per-call with `DATA_WRITE_ALLOW_ADHOC=1`.
 
 ### What it allows
 
 - GETs against the same endpoints (read is safe).
-- Story / row / document content writes — only schema-shape edits are guarded.
-- The project helper itself (matched by path).
+- MCP `createComponent` / `createContentType` / other create ops — no
+  partial-payload risk on creation.
+- The project helper itself — matched only when invoked as an executable
+  (`tsx|node|bun|deno|npx|pnpm|yarn|python|sh|bash` followed by the helper
+  path). Merely mentioning the helper path in a string does not unlock the
+  rule.
+
+### Per-call overrides
+
+| Env var                          | Effect                                                    |
+| -------------------------------- | --------------------------------------------------------- |
+| `DATA_WRITE_ALLOW_DESTRUCTIVE=1` | Allow one MCP `execute_destructive` call (deliberate del).|
+| `DATA_WRITE_ALLOW_ADHOC=1`       | Allow one ad-hoc backfill/load/seed/migrate script.       |
+| `DATA_WRITE_DEFAULTS_OFF=1`      | Disable built-in defaults; rely on project rules only.    |
 
 ### Helpers
 
@@ -101,6 +120,22 @@ in `src/` without `--force-delete`.
 
 After two consecutive wipe incidents — first the `item-category` schema, then the gold/jewellery/watches **story content** — the guard treats schema-shape mutations and row-content mutations the same. Both routes (PUT to `/components/*` and PUT to `/stories/*`) have the same partial-payload bug. Both must go through a helper that does GET → merge → PUT.
 
-MCP operations blocked: `updateComponent`, `updateContentType`, `updateCustomType`, `updateSchema`, `updateStory`, `updateEntry`, `updateDocument`, `updateRecord` (and their delete/create variants).
+MCP operations blocked: `updateComponent`, `updateContentType`, `updateCustomType`, `updateSchema`, `updateStory`, `updateEntry`, `updateDocument`, `updateRecord` (and their delete variants). Create variants are intentionally allowed — there are no sibling fields to wipe on a fresh create.
 
 Templates: `update-component-schema.template.ts` (schema) + `update-row-content.template.ts` (row/story/document content). Each enforces critical-field assertions and refuses to delete fields still referenced in `src/` without `--force-delete`.
+
+### Hardening (post-review)
+
+Adversarial review tightened a few rough edges:
+
+- **Creates allowed.** `createComponent` / `createContentType` removed from
+  the blocklist — no partial-payload risk on a brand-new record.
+- **Deliberate deletes have an override.** `DATA_WRITE_ALLOW_DESTRUCTIVE=1`
+  per-call instead of forcing the hook to be disabled globally.
+- **Supabase default narrowed.** Was matching the `/rest/` data API (routine
+  CRUD); now scoped to `/admin/` and `/pg-meta/` only.
+- **Helper-path match anchored.** A command must invoke the helper as an
+  executable (runner-token check). Previous substring match passed on
+  `echo helper && curl -X PUT …`.
+- **Implicit-mutation curl caught.** `curl -d @x.json …` (POST without
+  `-X`) and `curl -T file …` (PUT) now count as mutating methods.
