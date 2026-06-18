@@ -58,7 +58,7 @@ DEFAULTS=(
   "strapi-content-type:scripts/strapi/update-content-type.ts:/admin/content-type-builder|/admin/content-types:PUT|POST|DELETE"
   "prismic-custom-type:scripts/prismic/update-custom-type.ts:customtypes\\.prismic\\.io:PUT|POST|DELETE"
   "sanity-schema:scripts/sanity/update-schema.ts:api\\.sanity\\.io/v[0-9]+/.+/schemas:PUT|POST|DELETE"
-  "supabase-admin:scripts/supabase/alter-table.ts:supabase\\.co/(rest|pg|admin):PUT|POST|DELETE|PATCH"
+  "supabase-admin:scripts/supabase/alter-table.ts:supabase\\.(co|com)/(admin|pg-meta):PUT|POST|DELETE|PATCH"
   "convex-schema:scripts/convex/update-schema.ts:convex\\.(cloud|site)/(_system|admin|schema):PUT|POST|DELETE"
 )
 
@@ -92,15 +92,20 @@ case "$tool" in
     cmd="$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null || true)"
     ;;
   mcp__*__execute_destructive)
-    # Block all destructive ops outright. Helpers should use idempotent updates.
-    printf '\n[data-write-guard] BLOCKED: %s is destructive. Use the project helper or surface intent to the human.\n' "$tool" >&2
+    # Block destructive ops by default. Per-call override for the deliberate-delete case.
+    if [[ "${DATA_WRITE_ALLOW_DESTRUCTIVE:-0}" == "1" ]]; then
+      exit 0
+    fi
+    printf '\n[data-write-guard] BLOCKED: %s is destructive.\n' "$tool" >&2
+    printf '[data-write-guard] If this is an intentional delete the human asked for, re-run with DATA_WRITE_ALLOW_DESTRUCTIVE=1.\n' >&2
     exit 2
     ;;
   mcp__*__execute_mutating)
     mcp_op="$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_input",{}).get("parameters",{}).get("operation",""))' 2>/dev/null || true)"
     case "$mcp_op" in
-      updateComponent|deleteComponent|createComponent|updateComponentGroup|deleteComponentGroup|\
-      updateContentType|deleteContentType|createContentType|\
+      # Creates intentionally NOT blocked — nothing to wipe. Updates and deletes only.
+      updateComponent|deleteComponent|updateComponentGroup|deleteComponentGroup|\
+      updateContentType|deleteContentType|\
       updateCustomType|deleteCustomType|\
       updateSchema|deleteSchema)
         printf '\n[data-write-guard] BLOCKED: MCP %s is a schema-shape mutation.\n' "$mcp_op" >&2
@@ -129,14 +134,21 @@ esac
 # ---------------------------------------------------------------------------
 [[ -z "$cmd" ]] && exit 0
 
+RUNNERS='(tsx|ts-node|node|bun|deno|npx|pnpm|yarn|python3?|sh|bash)'
+# -d/--data*/-T/--upload-file imply POST or PUT respectively — body-bearing curl
+# without an explicit -X still mutates. Treat presence of any of these as a
+# destructive method on a registered host.
+BODY_FLAGS="(^|[[:space:]])(-d|--data|--data-raw|--data-binary|--data-urlencode|-T|--upload-file)([[:space:]]|=)"
+
 for rule in "${RULES[@]}"; do
   IFS=':' read -r label helper hostpat methods <<<"$rule"
   # Does the command hit this rule's hostname/pattern?
   if printf '%s' "$cmd" | grep -Eq "$hostpat"; then
-    # Does it use a destructive method?
-    if printf '%s' "$cmd" | grep -Eq -- "-X\\s*($methods)|--request\\s*($methods)|method:\\s*['\"]($methods)['\"]"; then
-      # Is the project helper being invoked?
-      if printf '%s' "$cmd" | grep -qF "$helper"; then
+    # Does it use a destructive method (explicit) or body-bearing curl (implicit)?
+    if printf '%s' "$cmd" | grep -Eq -- "-X[[:space:]]*($methods)|--request[[:space:]]*($methods)|method:[[:space:]]*['\"]($methods)['\"]|$BODY_FLAGS"; then
+      # Is the project helper being invoked as an executable (not just mentioned)?
+      helper_re="$(printf '%s' "$helper" | sed 's/[.[\*^$()+?{}|]/\\&/g')"
+      if printf '%s' "$cmd" | grep -Eq "(^|[[:space:]&|;])$RUNNERS[[:space:]]+([^&|;]*[[:space:]])?${helper_re}([[:space:]&|;]|$)"; then
         continue
       fi
       printf '\n[data-write-guard] BLOCKED [%s]: direct destructive write to %s.\n' "$label" "$hostpat" >&2
