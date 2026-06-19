@@ -53,6 +53,19 @@ for f in "${REPO_DIR}"/harness/*.sh; do
 done
 echo "  harness: $(ls "${REPO_DIR}"/harness/*.sh | wc -l | tr -d ' ') scripts"
 
+# --- harness hooks --------------------------------------------------------
+# PreToolUse guards referenced by project .claude/settings.json (e.g.
+# data-write-guard.sh and its _peh.sh helper library). Must land under
+# harness/hooks/ so $HOME/.claude/harness/hooks/<name> resolves.
+if compgen -G "${REPO_DIR}/harness/hooks/*.sh" > /dev/null; then
+  mkdir -p "${CLAUDE_DIR}/harness/hooks"
+  for f in "${REPO_DIR}"/harness/hooks/*.sh; do
+    place "$f" "${CLAUDE_DIR}/harness/hooks/$(basename "$f")"
+    chmod +x "${CLAUDE_DIR}/harness/hooks/$(basename "$f")"
+  done
+  echo "  hooks:   $(ls "${REPO_DIR}"/harness/hooks/*.sh | wc -l | tr -d ' ') guards"
+fi
+
 # --- skill installer helper ----------------------------------------------
 if [[ -f "${REPO_DIR}/skills/_install-skill.sh" ]]; then
   place "${REPO_DIR}/skills/_install-skill.sh" "${CLAUDE_DIR}/skills/_install-skill.sh"
