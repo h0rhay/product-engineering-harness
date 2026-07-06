@@ -188,7 +188,7 @@ Status: done
   cat >> "$file" <<EOF
 
 ## Completion
-$(date '+%Y-%m-%d %H:%M:%S') — ${summary}
+$(date '+%Y-%m-%d %H:%M:%S') - ${summary}
 EOF
 }
 
@@ -552,7 +552,7 @@ CRITICAL: every agent must respect the BINDING CONTEXT. If a delegated agent's o
     mark_issue_done "$NEXT_ISSUE" "$summary"
     if command -v git >/dev/null 2>&1 && git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
       git -C "$PROJECT_DIR" add -A
-      git -C "$PROJECT_DIR" commit -m "$COMMIT_PREFIX: $ISSUE_ID — $summary" >/dev/null 2>&1 || echo "  (nothing to commit)"
+      git -C "$PROJECT_DIR" commit -m "$COMMIT_PREFIX: $ISSUE_ID - $summary" >/dev/null 2>&1 || echo "  (nothing to commit)"
     fi
     # Eval stage: run reviewer agent against the just-committed diff
     if [[ -x "$HARNESS_DIR/eval-stage.sh" ]]; then
