@@ -562,3 +562,7 @@ npm install -g skillui
 ```bash
 # deepsec is invoked on-demand via npx by the security agent; no global install needed
 ```
+
+## Cloud (Managed Agents)
+
+The harness has a cloud execution arm that triggers a CMA multiagent session against a workpiece repo. See [`cloud/README.md`](./cloud/README.md).
