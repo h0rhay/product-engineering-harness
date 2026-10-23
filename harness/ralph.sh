@@ -91,6 +91,49 @@ CONTEXT_FILES=("${CONTEXT_FILES[@]:-}")
 AGENTS_ENABLED=("${AGENTS_ENABLED[@]:-product-manager engineer tester}")
 
 # ---------------------------------------------------------------------------
+# Stale-checkout guard. Ralph reads issue statuses from the working tree, so
+# a checkout that is off the default branch or behind origin re-runs work
+# that is already done upstream (ghost issues). 2026-07-08 incident: a dead
+# feature branch resurrected about-us-parity issues twice, including a
+# Storyblok content write. Override only with RALPH_ALLOW_STALE=1.
+# ---------------------------------------------------------------------------
+if [[ "${RALPH_ALLOW_STALE:-0}" != "1" ]] && git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  DEFAULT_BRANCH="$(git -C "$PROJECT_DIR" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+  DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+  CURRENT_BRANCH="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD)"
+  # Auto-branch guard. A scoped sequential run is feature work, so it must not
+  # commit onto the default branch. 2026-08-12 incident (CUST-1094): ran on
+  # main, 9 slice commits landed on local main with no PR; recovered by hand
+  # afterwards. When invoked with --scope while sitting on the default branch
+  # (and not --parallel, which already isolates via worktree branches), derive
+  # ralph/<feature> from the scope glob and switch to it first. ralph/* is an
+  # allowed branch below, so the refuse check then passes.
+  if [[ -n "$SCOPE_GLOB" && "$PARALLEL" -eq 0 && "$CURRENT_BRANCH" == "$DEFAULT_BRANCH" ]]; then
+    FEATURE="$(echo "$SCOPE_GLOB" | sed -E 's#.*issues/##; s#/.*##; s#[^a-zA-Z0-9._-]#-#g')"
+    FEATURE="${FEATURE:-scoped}"
+    RALPH_BRANCH="ralph/${FEATURE}"
+    git -C "$PROJECT_DIR" switch "$RALPH_BRANCH" 2>/dev/null \
+      || git -C "$PROJECT_DIR" switch -c "$RALPH_BRANCH" \
+      || { echo "ralph: could not create $RALPH_BRANCH" >&2; exit 1; }
+    CURRENT_BRANCH="$RALPH_BRANCH"
+    echo "ralph: scoped run isolated on branch '$RALPH_BRANCH' (not $DEFAULT_BRANCH)."
+  fi
+  if [[ "$CURRENT_BRANCH" != "$DEFAULT_BRANCH" && "$CURRENT_BRANCH" != ralph/* ]]; then
+    echo "ralph: refusing to run on branch '$CURRENT_BRANCH' (default: $DEFAULT_BRANCH)." >&2
+    echo "Issue statuses on side branches go stale and resurrect finished work." >&2
+    echo "Switch to $DEFAULT_BRANCH and pull, or set RALPH_ALLOW_STALE=1 to override." >&2
+    exit 1
+  fi
+  git -C "$PROJECT_DIR" fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null || true
+  BEHIND="$(git -C "$PROJECT_DIR" rev-list --count "HEAD..origin/$DEFAULT_BRANCH" 2>/dev/null || echo 0)"
+  if (( BEHIND > 0 )); then
+    echo "ralph: refusing to run — checkout is $BEHIND commit(s) behind origin/$DEFAULT_BRANCH." >&2
+    echo "Pull first, or set RALPH_ALLOW_STALE=1 to override." >&2
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 get_field() {
@@ -149,7 +192,9 @@ pick_next_issue() {
   local f best_pri=999999 best_file=""
   local pri
 
-  for f in $ISSUES_GLOB; do
+  # --scope narrows the sequential picker too (2026-07-08: it was silently
+  # parallel-only, so scoped sequential runs wandered into the full backlog).
+  for f in ${SCOPE_GLOB:-$ISSUES_GLOB}; do
     [[ -f "$f" ]] || continue
     [[ "$(issue_status "$f")" == "ready-for-agent" ]] || continue
 
@@ -539,6 +584,25 @@ CRITICAL: every agent must respect the BINDING CONTEXT. If a delegated agent's o
     fi
   done
   rm -f /tmp/ralph-qc-$$.log
+
+  # Empty-implementation guard. Passing the (unchanged) quality gates proves
+  # nothing if the agent wrote no code. 2026-08-13 incident (CUST-1094): slices
+  # 04 and 07 were marked "verified clean" having changed only their own issue
+  # .md file. Require at least one changed file outside issues/ before done.
+  if [[ $all_pass -eq 1 ]] && git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    real_changes="$(git -C "$PROJECT_DIR" status --porcelain | awk '{print $NF}' | grep -vc '^issues/' || true)"
+    if [[ "${real_changes:-0}" -eq 0 ]]; then
+      echo
+      echo "✗ Empty implementation: $ISSUE_ID passed gates but produced no code change outside issues/."
+      echo "  Refusing to mark done. Setting Status: needs-info and moving on."
+      sed -i.bak -E "s/^[Ss]tatus:.*$/Status: needs-info/" "$NEXT_ISSUE" && rm -f "${NEXT_ISSUE}.bak"
+      git -C "$PROJECT_DIR" add "$NEXT_ISSUE" >/dev/null 2>&1 || true
+      git -C "$PROJECT_DIR" commit -m "$COMMIT_PREFIX: $ISSUE_ID - empty implementation, set needs-info" >/dev/null 2>&1 || true
+      notify "Ralph EMPTY" "$ISSUE_ID produced no code; set needs-info, not done" "Basso"
+      echo "  Duration: $(( $(date +%s) - iteration_start ))s"
+      continue
+    fi
+  fi
 
   if [[ $all_pass -eq 1 ]]; then
     summary="${ISSUE_ID} verified clean"
