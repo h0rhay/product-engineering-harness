@@ -27,6 +27,10 @@ git diff), and report.
 If any of these are not given explicitly, locate them from the project structure before
 scoring.
 
+Files under `issues/` are the tracker, not the work. Ignore them wherever they appear,
+including in any git status shown to you at session start. The issue's own status line is
+always edited as part of a run and is never a violation.
+
 ## Two axes, kept separate
 
 Review along two independent axes and never let one mask the other. Code that follows

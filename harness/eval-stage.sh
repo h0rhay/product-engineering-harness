@@ -65,10 +65,13 @@ build_context_block() {
 }
 
 # Build the diff. Try to get just this issue's commit; fall back to full ref.
+# Tracker files under issues/ are excluded: the issue's own status edits are
+# always in the diff and are not the work under review (same rule as the
+# empty-implementation guard in ralph.sh).
 if [[ "$GIT_REF" == "STAGED" ]]; then
-  DIFF_CONTENT="$(git -C "$PROJECT_DIR" diff --cached --stat --patch 2>/dev/null || echo "(no diff available)")"
+  DIFF_CONTENT="$(git -C "$PROJECT_DIR" diff --cached --stat --patch -- . ':(exclude)issues/' 2>/dev/null || echo "(no diff available)")"
 else
-  DIFF_CONTENT="$(git -C "$PROJECT_DIR" show --stat --patch "$GIT_REF" 2>/dev/null || echo "(no diff available)")"
+  DIFF_CONTENT="$(git -C "$PROJECT_DIR" show --stat --patch "$GIT_REF" -- . ':(exclude)issues/' 2>/dev/null || echo "(no diff available)")"
 fi
 
 PROMPT="${REVIEWER_PROMPT}
