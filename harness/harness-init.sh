@@ -7,7 +7,7 @@
 #
 # Files created:
 #   .claude/harness.config.sh           Ralph config (commands, context files)
-#   .scratch/example/issues/01-*.md     Starter issue
+#   issues/example/01-*.md             Starter issue
 #   CONTEXT.md                          Empty glossary stub
 #   docs/agents/issue-tracker.md        Local-markdown tracker convention
 #   docs/agents/triage-labels.md        Triage label mapping (Matt's defaults)
@@ -63,7 +63,7 @@ else
 fi
 
 mkdir -p "${PROJECT_DIR}/.claude"
-mkdir -p "${PROJECT_DIR}/.scratch/example/issues"
+mkdir -p "${PROJECT_DIR}/issues/example" "${PROJECT_DIR}/.scratch"
 mkdir -p "${PROJECT_DIR}/docs/agents"
 
 # ---------------------------------------------------------------------------
@@ -179,19 +179,20 @@ fi
 cat > "${PROJECT_DIR}/docs/agents/issue-tracker.md" <<'EOF'
 # Issue tracker: Local Markdown
 
-Issues and PRDs for this repo live as markdown files in `.scratch/`.
+Issues and PRDs for this repo live as tracked markdown files under `issues/`. Never put
+issue files in `.scratch/`; that directory is gitignored and holds transient artefacts only.
 
 ## Conventions
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The PRD is `.scratch/<feature-slug>/PRD.md`
-- Implementation issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
+- One feature per directory: `issues/<feature-slug>/`
+- The PRD is `issues/<feature-slug>/PRD.md`
+- Implementation issues are `issues/<feature-slug>/<NN>-<slug>.md`, numbered from `01`
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md`)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+Create a new file under `issues/<feature-slug>/` (creating the directory if needed).
 
 ## When a skill says "fetch the relevant ticket"
 
@@ -199,7 +200,7 @@ Read the file at the referenced path. The user will normally pass the path or th
 
 ## Ralph integration
 
-The autonomous `harness ralph` loop reads `.scratch/*/issues/*.md`. It picks the next file with `Status: ready-for-agent` whose `Blocked-by:` entries are all `done`. Ralph marks completed issues `Status: done` and commits.
+The autonomous `harness ralph` loop reads `issues/*/*.md` (the `ISSUES_GLOB` in `.claude/harness.config.sh`). It picks the next file with `Status: ready-for-agent` whose `Blocked-by:` entries are all `done`. Ralph marks completed issues `Status: done` and commits.
 
 Other valid statuses (do not change without updating ralph.sh): `needs-triage`, `needs-info`, `ready-for-human`, `wontfix`.
 
@@ -282,7 +283,8 @@ AGENT_BLOCK='## Agent skills
 
 ### Issue tracker
 
-Issues live as markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Tracked issues and PRDs live at the repo root under `issues/<feature>/`. `.scratch/` is
+gitignored (transient harness artifacts only). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -322,7 +324,7 @@ fi
 # ---------------------------------------------------------------------------
 # Starter example issue
 # ---------------------------------------------------------------------------
-cat > "${PROJECT_DIR}/.scratch/example/issues/01-hello-world.md" <<'EOF'
+cat > "${PROJECT_DIR}/issues/example/01-hello-world.md" <<'EOF'
 # 01 — Hello world (example)
 
 Status: needs-triage
@@ -357,7 +359,7 @@ Created / edited:
   docs/agents/issue-tracker.md
   docs/agents/triage-labels.md
   docs/agents/domain.md
-  .scratch/example/issues/01-hello-world.md
+  issues/example/01-hello-world.md
   $(basename "$TARGET_FILE")        ← Agent skills block
 
 Next steps (no follow-up Claude setup needed):

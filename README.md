@@ -398,7 +398,7 @@ engineer      →  reads the approved direction + handoff + screenshots
        ↓
 quality gates →  lint, test, typecheck, build (must all pass)
        ↓
-reviewer      →  4-category scored eval, JSON to .scratch/<feature>/issues/<id>.eval.json
+reviewer      →  4-category scored eval, JSON to issues/<feature>/<id>.eval.json
                   verdict: pass / concerns / fail
 ```
 
