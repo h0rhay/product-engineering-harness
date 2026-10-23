@@ -112,8 +112,10 @@ case "$tool" in
   mcp__*__execute_mutating)
     mcp_op="$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_input",{}).get("parameters",{}).get("operation",""))' 2>/dev/null || true)"
     case "$mcp_op" in
-      # Creates intentionally NOT blocked — nothing to wipe. Updates and deletes only.
-      updateComponent|deleteComponent|updateComponentGroup|deleteComponentGroup|\
+      # Creates are not blocked (nothing to wipe), except createComponent: a
+      # component created with a partial schema is the same wipe one step later
+      # (project guard rule since 2026-06-26, merged here 2026-10-23).
+      createComponent|updateComponent|deleteComponent|updateComponentGroup|deleteComponentGroup|\
       updateContentType|deleteContentType|\
       updateCustomType|deleteCustomType|\
       updateSchema|deleteSchema)
@@ -124,7 +126,7 @@ case "$tool" in
           "(none — schema edits must go through a helper)"
         exit 2
         ;;
-      updateStory|updateEntry|updateDocument|updateRecord)
+      updateStory|deleteStory|updateEntry|updateDocument|updateRecord)
         peh_block "data-write-guard" \
           "MCP $mcp_op is a row-content mutation" \
           "Partial-payload PUTs wipe sibling fields. Burned us 3× in 48h on Storyblok." \
