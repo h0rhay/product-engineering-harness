@@ -10,7 +10,7 @@
 #   harness help                Show this message
 #
 # Per-project config lives at .claude/harness.config.sh
-# Issues live under .scratch/<feature-slug>/issues/*.md
+# Issues live under issues/<feature-slug>/*.md
 
 set -euo pipefail
 
@@ -40,7 +40,7 @@ Mode flags (per-project, edits .claude/harness.config.sh):
 Files:
   Global scripts:               $HARNESS_DIR
   Per-project config:           .claude/harness.config.sh
-  Issues:                       .scratch/<feature>/issues/*.md
+  Issues:                       issues/<feature>/*.md
 EOF
 }
 

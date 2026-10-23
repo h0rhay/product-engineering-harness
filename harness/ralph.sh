@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ralph — autonomous coding loop.
-# Reads .scratch/*/issues/*.md, picks next ready-for-agent issue,
+# Reads issues/*/*.md (ISSUES_GLOB), picks next ready-for-agent issue,
 # spawns claude with binding context, runs verification, marks done, commits.
 
 set -euo pipefail
@@ -85,7 +85,7 @@ source "$CONFIG_FILE"
 
 PROJECT_NAME="${PROJECT_NAME:-$(basename "$PROJECT_DIR")}"
 COMMIT_PREFIX="${COMMIT_PREFIX:-feat(ralph)}"
-ISSUES_GLOB="${ISSUES_GLOB:-.scratch/*/issues/*.md}"
+ISSUES_GLOB="${ISSUES_GLOB:-issues/*/*.md}"
 QUALITY_CHECKS=("${QUALITY_CHECKS[@]:-}")
 CONTEXT_FILES=("${CONTEXT_FILES[@]:-}")
 AGENTS_ENABLED=("${AGENTS_ENABLED[@]:-product-manager engineer tester}")

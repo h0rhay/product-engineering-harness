@@ -67,7 +67,7 @@ When invoked, walk this list. Surface a one-line status per item; act on items t
   - [ ] CI green
   ```
 
-- **Link to the issue file path.** `Closes: .scratch/<feature>/issues/<id>.md`.
+- **Link to the issue file path.** `Closes: issues/<feature>/<id>.md`.
 - **Reviewers.** Don't auto-assign; let the user do that.
 
 ## Deployment plumbing (when applicable)

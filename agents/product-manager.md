@@ -23,7 +23,7 @@ Then read:
 - The project's `CONTEXT.md` (domain glossary)
 - Any existing `docs/adr/*.md` for prior decisions you must respect
 - `docs/rules.md` for the binding constraints PRDs must operate inside
-- Existing `.scratch/<feature>/` directories for context on adjacent work
+- Existing `issues/<feature>/` directories for context on adjacent work
 
 ## Your operating principles
 
