@@ -103,8 +103,14 @@ ISSUES_GLOB="issues/*/*.md"
 #     disabled: skip straight to engineer (current behaviour for code-only slices)
 #
 # Reviewer always runs as the eval stage; not listed here.
+#
+#   EVAL_GATE
+#     block:    (default) a reviewer verdict of fail, or an eval that did not run,
+#               sets the issue to needs-info instead of done
+#     advisory: eval result is recorded but never blocks (pre-2026-10 behaviour)
 HARNESS_MODE="poc"           # change to "full" when promoting beyond prototype
 DESIGN_PHASE="disabled"      # change to "enabled" when slices have a visual component
+EVAL_GATE="block"            # "advisory" to record evals without gating on them
 
 AGENTS_ENABLED=("product-manager" "engineer" "tester")
 case "\$HARNESS_MODE" in

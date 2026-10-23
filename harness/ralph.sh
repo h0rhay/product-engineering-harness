@@ -611,18 +611,42 @@ CRITICAL: every agent must respect the BINDING CONTEXT. If a delegated agent's o
       hint="$(grep -m1 -E "^RALPH_RESULT: success" "$OUTPUT_FILE" 2>/dev/null | sed -E 's/^RALPH_RESULT:[[:space:]]*success[[:space:]]*—?[[:space:]]*//' || true)"
       [[ -n "$hint" ]] && summary="$hint"
     fi
+    has_git=0
+    command -v git >/dev/null 2>&1 && git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 && has_git=1
+
+    # Eval gate (2026-10-23): the reviewer runs on the staged diff BEFORE the
+    # issue is marked done. Until now it ran after the done-commit and its
+    # verdict was ignored; 9 of 33 evals said fail and all 9 shipped as done.
+    # EVAL_GATE=advisory in harness.config.sh restores the old behaviour.
+    eval_rc=0
+    if [[ -x "$HARNESS_DIR/eval-stage.sh" ]]; then
+      [[ $has_git -eq 1 ]] && git -C "$PROJECT_DIR" add -A
+      echo
+      echo "── Eval (reviewer agent) ──"
+      "$HARNESS_DIR/eval-stage.sh" "$NEXT_ISSUE" STAGED || eval_rc=$?
+    fi
+    if [[ "${EVAL_GATE:-block}" != "advisory" && $eval_rc -ne 0 ]]; then
+      reason="reviewer verdict fail"; [[ $eval_rc -ne 2 ]] && reason="eval did not run (exit $eval_rc)"
+      echo
+      echo "✗ Eval gate: $ISSUE_ID passed quality checks but $reason."
+      echo "  Refusing to mark done. Setting Status: needs-info and moving on."
+      sed -i.bak -E "s/^[Ss]tatus:.*$/Status: needs-info/" "$NEXT_ISSUE" && rm -f "${NEXT_ISSUE}.bak"
+      if [[ $has_git -eq 1 ]]; then
+        git -C "$PROJECT_DIR" add -A
+        git -C "$PROJECT_DIR" commit -m "$COMMIT_PREFIX: $ISSUE_ID - $reason, set needs-info" >/dev/null 2>&1 || true
+      fi
+      notify "Ralph EVAL FAIL" "$ISSUE_ID: $reason; set needs-info, not done" "Basso"
+      echo "  Duration: $(( $(date +%s) - iteration_start ))s"
+      continue
+    fi
+    [[ $eval_rc -ne 0 ]] && echo "  (EVAL_GATE=advisory: eval exit $eval_rc ignored)"
+
     echo
     echo "✓ Success: $summary"
     mark_issue_done "$NEXT_ISSUE" "$summary"
-    if command -v git >/dev/null 2>&1 && git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    if [[ $has_git -eq 1 ]]; then
       git -C "$PROJECT_DIR" add -A
       git -C "$PROJECT_DIR" commit -m "$COMMIT_PREFIX: $ISSUE_ID - $summary" >/dev/null 2>&1 || echo "  (nothing to commit)"
-    fi
-    # Eval stage: run reviewer agent against the just-committed diff
-    if [[ -x "$HARNESS_DIR/eval-stage.sh" ]]; then
-      echo
-      echo "── Eval (reviewer agent) ──"
-      "$HARNESS_DIR/eval-stage.sh" "$NEXT_ISSUE" HEAD || echo "  (eval failed; iteration still counts as success)"
     fi
     notify "Ralph ✓" "$ISSUE_ID — $summary" "Glass"
   else

@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# eval-stage — invoke the reviewer agent on a single issue + its diff.
-# Writes a JSON eval to .scratch/<feature>/issues/<id>.eval.json.
+# eval-stage: invoke the reviewer agent on a single issue + its diff.
+# Writes a JSON eval to issues/<feature>/<id>.eval.json.
 #
 # Usage:
-#   eval-stage.sh <issue-file> [git-ref]
+#   eval-stage.sh <issue-file> [git-ref|STAGED]
 #
-# git-ref defaults to HEAD (the most recent commit).
+# git-ref defaults to HEAD. STAGED reviews the index (git diff --cached), which is
+# what ralph passes before it decides whether to mark the issue done.
+#
+# Exit codes: 0 verdict pass or concerns, 2 verdict fail, 1 the eval did not run.
+# Env: REVIEWER_FILE overrides the agent file (tests); EVAL_MODEL overrides the
+# model, otherwise the reviewer frontmatter's model: line is used.
 
 set -euo pipefail
 
@@ -26,7 +31,7 @@ fi
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
-REVIEWER_FILE="${HOME}/.claude/agents/reviewer.md"
+REVIEWER_FILE="${REVIEWER_FILE:-${HOME}/.claude/agents/reviewer.md}"
 if [[ ! -f "$REVIEWER_FILE" ]]; then
   echo "Reviewer agent not found at $REVIEWER_FILE" >&2
   exit 1
@@ -41,11 +46,14 @@ EVAL_FILE="$(dirname "$ISSUE_FILE")/$(basename "$ISSUE_FILE" .md).eval.json"
 
 # Strip frontmatter from the reviewer agent file to get just the system prompt body
 REVIEWER_PROMPT="$(awk 'BEGIN{p=0} /^---$/{c++; if(c==2){p=1; next}} p' "$REVIEWER_FILE")"
+# Pin the model so the eval never inherits the session default (2026-10-23).
+MODEL="${EVAL_MODEL:-$(awk -F': *' '/^model:/{print $2; exit}' "$REVIEWER_FILE")}"
+MODEL="${MODEL:-sonnet}"
 
 # Build the binding context block
 build_context_block() {
   local f
-  for f in "${CONTEXT_FILES[@]}"; do
+  for f in ${CONTEXT_FILES[@]+"${CONTEXT_FILES[@]}"}; do
     [[ -z "$f" ]] && continue
     if [[ -f "$f" ]]; then
       echo
@@ -57,7 +65,11 @@ build_context_block() {
 }
 
 # Build the diff. Try to get just this issue's commit; fall back to full ref.
-DIFF_CONTENT="$(git -C "$PROJECT_DIR" show --stat --patch "$GIT_REF" 2>/dev/null || echo "(no diff available)")"
+if [[ "$GIT_REF" == "STAGED" ]]; then
+  DIFF_CONTENT="$(git -C "$PROJECT_DIR" diff --cached --stat --patch 2>/dev/null || echo "(no diff available)")"
+else
+  DIFF_CONTENT="$(git -C "$PROJECT_DIR" show --stat --patch "$GIT_REF" 2>/dev/null || echo "(no diff available)")"
+fi
 
 PROMPT="${REVIEWER_PROMPT}
 
@@ -88,7 +100,7 @@ ${DIFF_CONTENT}
 Now produce the JSON eval as specified above. Output nothing but the JSON object."
 
 echo "Evaluating $ID against $GIT_REF..."
-RAW_OUTPUT="$(claude --dangerously-skip-permissions -p "$PROMPT" 2>/dev/null)"
+RAW_OUTPUT="$(claude --dangerously-skip-permissions --model "$MODEL" -p "$PROMPT" 2>/dev/null)"
 
 # Strip code fences and any prose around the JSON
 JSON_ONLY="$(echo "$RAW_OUTPUT" | sed -n '/^{/,/^}$/p')"
@@ -130,3 +142,8 @@ if vios:
         rule = v.get('rule','?')[:60]
         print(f"    [{sev}] {rule}")
 PY
+
+# Exit 2 on a fail verdict so the caller can gate on it.
+VERDICT="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('verdict',''))" "$EVAL_FILE")"
+[[ "$VERDICT" == "fail" ]] && exit 2
+exit 0
