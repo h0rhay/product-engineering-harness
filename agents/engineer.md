@@ -111,6 +111,97 @@ needs a `/* cite: ... */` comment in the same edit (a PreToolUse hook
 blocks it otherwise). If the documented mechanism can't achieve the
 design, stop and escalate in your report.
 
+## Parity-match mode (when active)
+
+If the project's `.claude/harness.config.sh` sets `HARNESS_MODE="parity-match"`,
+you are NOT in green-field mode — you are matching a canonical live site
+(`PARITY_TARGET_URL`). The orchestrator has already run a live-CSS audit and
+written the rules to `.scratch/<feature>/live-audits/<issue-id>.md`. Read
+that file first, before opening any project source.
+
+Contract in parity-match mode:
+
+- Every code change cites a rule from the audit file IN THE COMMIT MESSAGE
+  and PR description. Do not add prose citation comments in code; the
+  audit file plus commit message are the durable trail. One exception: a
+  magic-pixel positioning value still needs the `/* cite: ... */` comment
+  on the same edit, because the no-positioning-hacks hook blocks the edit
+  without it (see above).
+- Never invent a value not in the audit file. If the audit doesn't cover an
+  element you need to change, STOP and surface it to the orchestrator
+  ("audit missing for `<selector>` — re-run live extraction"). Don't infer
+  from `getComputedStyle`, screenshots, or the class map.
+- `var(--token)` references in the audit map 1:1 to tokens in
+  `src/styles/global.css` (or the project's token source). If the audit
+  cites a token that doesn't exist in the project's `@theme`, add it there
+  first — same name, same value — then use it.
+- The reviewer rejects diff hunks that don't map to an entry in the audit
+  file. Don't ship a change you can't point at a rule for.
+
+## Composition over per-element styling (harness default)
+
+Layout, alignment, rhythm, and breathing room are **container concerns**.
+They live on the wrapper, not on each child. The moment you add the same
+class (`text-center`, `items-center`, a `gap`, a `padding`) to multiple
+sibling elements, you've written the same intent at the wrong scope —
+push it onto the parent.
+
+Concrete rules (full rationale in the `every-layout` skill):
+
+- No `text-center`/`text-start`/`text-end` on individual elements when
+  siblings share the same alignment. Put it on a `<Box align="…">` (or
+  equivalent) once.
+- No `items-center`/`items-start` on individual flex items. Push to the
+  flex parent.
+- No ad-hoc `gap-…` between siblings — use a primitive (Stack, Cluster,
+  Switcher) that names the rhythm.
+- No ad-hoc `padding-block:…` on `<section>` elements — one
+  `--section-gap` token plus a base `section { padding-block: var(--section-gap) }`
+  rule controls the whole site.
+- A `<h2>` does not know whether the surrounding section is centred or
+  left-aligned. That's the container's job.
+
+Self-test before reporting done: for every child you touched, would
+removing all alignment / rhythm / breathing-room classes from it leave it
+correctly laid out, given the right parent? If yes, composition is right.
+If no, the intent escaped to the wrong scope. Push it up before shipping.
+
+## Design-system fidelity (harness default)
+
+Every project has a design-token source of truth — typically
+`src/styles/global.css` (`@theme` block), `tailwind.config.*`, or a
+dedicated `tokens.css`. Before writing any class string, inline style,
+or styled-component, you read that file end-to-end and treat the
+declared tokens as the **closed set of permitted values** for colors,
+spacing, font families, radii, shadows, and breakpoints.
+
+Rules:
+
+- Zero hardcoded `oklch()`, `rgb()`, `hsl()`, or `#hex` colour literals
+  in `class` / `className` / `style` strings. Use the matching
+  `var(--token)`. SVG attributes (`fill="…"`, `stroke="…"`) are exempt.
+- Zero arbitrary `[Npx]` / `[Nrem]` values in spacing utilities
+  (padding, margin, gap, inset, block-size, inline-size, top/right/
+  bottom/left). Use the project's modular-scale tokens. Exception:
+  values cited from a measured source with a `// cite: ...` comment
+  on the same edit (e.g. `// cite: live DOM .hero p 14px 2026-06-13`).
+- Zero hardcoded `font-family:` literals. Use `var(--font-*)`.
+- If you need a value that isn't in the token set, **add the token
+  first** in the source-of-truth file, then use it. Do not inline a
+  literal "just for this one place."
+- Tailwind v4 arbitrary syntax requires the property namespace prefix
+  inside the brackets so the value parser can disambiguate:
+  `bg-[color:var(--token)]`, `text-[color:var(--token)]`,
+  `border-[color:var(--token)]`, `[padding-block:var(--s1)]`,
+  `[font-family:var(--font-display)]`. Bare `bg-[var(--token)]` works
+  for backgrounds but the prefixed form is the project standard.
+- The project's `docs/rules.md` may declare additional bindings (named
+  scales, semantic colour aliases, allowed-utility lists). Those take
+  precedence over this file.
+
+The reviewer evaluates every diff against this rule. Uncommented
+literals fail the review regardless of whether the build passes.
+
 ## Token discipline (harness default)
 
 Context and usage limits are shared across the whole ralph run. If you
@@ -118,3 +209,9 @@ have the Skill tool, load the `tokenwise` skill before starting work.
 Either way, operate tokenwise: terse output, no preamble or recap,
 never restate file contents you just read, summaries over transcripts,
 targeted reads (grep, offset/limit) over whole-file dumps.
+
+## No hacks (binding)
+
+A fix scoped to the current blocker (vendor down, quota out, content not yet imported) is a hack. Do not propose one without first probing the durable problem shape — use `/grill-with-docs` or a tight round of questions until the durable form is visible. The durable form is content-shape-driven / schema-driven / capability-driven, never keyed on the blocker's identity.
+
+Self-test: "Once the blocker clears, do we delete this code?" If yes — it's a hack. Name it as such, name the durable replacement, file the follow-up issue before shipping.

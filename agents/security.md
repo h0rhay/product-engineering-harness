@@ -26,7 +26,7 @@ Then decide whether deepsec is warranted for this codebase. The bar:
 - Real users or real data at stake (or about to be)
 - Production deploy imminent
 
-For a POC test app (like TodoTest), deepsec is overkill; a manual review using the checklist below is enough.
+For a POC app, deepsec is overkill; a manual review using the checklist below is enough.
 
 ## When deepsec is warranted
 

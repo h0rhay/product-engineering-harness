@@ -53,7 +53,6 @@ Pencil ships an installable CLI at `@pencil.dev/cli`. The CLI's Agent Mode (`pen
    pencil --out .scratch/<feature>/design/<NN-slice>.pen \
           --prompt "<concise prompt derived from the direction brief — see prompt-building below>" \
           --workspace . \
-          --model claude-opus-4-7 \
           --effort high
    ```
    If the slice modifies an existing `.pen`, add `--in <prev.pen>`. The `--out` flag is REQUIRED and writes the `.pen` to disk; that's the persistence guarantee the MCP path lacks.

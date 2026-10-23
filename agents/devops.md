@@ -42,7 +42,7 @@ When invoked, walk this list. Surface a one-line status per item; act on items t
 - **Type and scope.** Type is one of the conventional set. Scope is the feature slug (`feat(todo-app): ...`) or the affected area (`fix(storage): ...`).
 - **Subject under 72 chars.** Imperative mood. "Add filter" not "Added filter" or "Adds filter".
 - **Body when needed.** Wrap at 72 cols. Explain WHY, not what (the diff covers what). Reference issues by their slug (`refs: distinctive-typography`).
-- **No Claude attribution.** Per `OBIT/CLAUDE.md` and similar repos, never add `Co-Authored-By: Claude` or `Generated with Claude Code` lines unless the project explicitly opts in.
+- **No Claude attribution.** Unless the project opts in, never add `Co-Authored-By: Claude` or `Generated with Claude Code` lines.
 - **Sign off only if the project uses signed commits.** Don't introduce DCO sign-off where it wasn't already present.
 
 ## PR title and body rules
