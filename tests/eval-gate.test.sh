@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Smallest check that fails if the eval gate logic breaks:
-# eval-stage.sh must exit 0 on pass/concerns, 2 on fail, 1 when no JSON comes back.
+# eval-stage.sh must exit 0 on pass/concerns, 2 on fail, 1 when no JSON comes back,
+# and 1 when VISUAL_REVIEW=on but the visual review cannot run.
 # Uses a fake `claude` on PATH, so no model call and no cost.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -30,4 +31,7 @@ run() { FAKE_VERDICT="$1" "$HARNESS/eval-stage.sh" issues/f/01-thing.md STAGED >
 [[ "$(run fail)" == 2 ]]     || { echo "FAIL: fail should exit 2"; exit 1; }
 [[ "$(run none)" == 1 ]]     || { echo "FAIL: no JSON should exit 1"; exit 1; }
 grep -q '"verdict":"fail"' issues/f/01-thing.eval.json || { echo "FAIL: eval file not written"; exit 1; }
-echo "eval-gate: 5 checks passed"
+# VISUAL_REVIEW=on wires in visual-stage.sh: with no URLs set it cannot run, so exit 1
+printf 'CONTEXT_FILES=()\nVISUAL_REVIEW=on\n' > .claude/harness.config.sh
+[[ "$(run pass)" == 1 ]]     || { echo "FAIL: visual review that cannot run should exit 1"; exit 1; }
+echo "eval-gate: 6 checks passed"

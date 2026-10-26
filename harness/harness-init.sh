@@ -62,6 +62,18 @@ else
   TEST_CMDS_DEFAULT='  # "your-test-command-here"'
 fi
 
+# Visual review dev server guess: the package.json "dev" script, run with the
+# package manager the lockfile names. Edit in the config if wrong.
+VISUAL_DEV_CMD_DEFAULT=""
+VISUAL_DEV_URL_DEFAULT="http://localhost:3000"
+if [[ -f "${PROJECT_DIR}/package.json" ]] && grep -q '"dev"[[:space:]]*:' "${PROJECT_DIR}/package.json"; then
+  if [[ -f "${PROJECT_DIR}/pnpm-lock.yaml" ]]; then VISUAL_DEV_CMD_DEFAULT="pnpm dev"
+  elif [[ -f "${PROJECT_DIR}/yarn.lock" ]]; then VISUAL_DEV_CMD_DEFAULT="yarn dev"
+  else VISUAL_DEV_CMD_DEFAULT="npm run dev"; fi
+  grep -q '"vite"' "${PROJECT_DIR}/package.json" && VISUAL_DEV_URL_DEFAULT="http://localhost:5173"
+  grep -q '"astro"' "${PROJECT_DIR}/package.json" && VISUAL_DEV_URL_DEFAULT="http://localhost:4321"
+fi
+
 mkdir -p "${PROJECT_DIR}/.claude"
 mkdir -p "${PROJECT_DIR}/issues/example" "${PROJECT_DIR}/.scratch"
 mkdir -p "${PROJECT_DIR}/docs/agents"
@@ -119,6 +131,22 @@ esac
 case "\$DESIGN_PHASE" in
   enabled) AGENTS_ENABLED+=("art-director" "designer") ;;
 esac
+
+# Visual review: part of the eval gate. Runs the app locally, screenshots the pages
+# the change touches, compares them with VISUAL_BASE_URL and judges them against the
+# issue's acceptance criteria. Not done or broken layout fails the gate.
+# To turn on: set VISUAL_BASE_URL (usually staging), check the dev server lines,
+# then set VISUAL_REVIEW="on". Needs Playwright's Chromium (downloaded on first run).
+VISUAL_REVIEW="off"
+# "Before" screenshots: staging or production.
+VISUAL_BASE_URL=""
+# "After" screenshots: the local build, started with VISUAL_DEV_CMD if not running.
+VISUAL_DEV_URL="${VISUAL_DEV_URL_DEFAULT}"
+VISUAL_DEV_CMD="${VISUAL_DEV_CMD_DEFAULT}"
+VISUAL_DEV_TIMEOUT_SECS=120
+VISUAL_VIEWPORTS="1440x900 390x844"
+# Optional Playwright storage file (cookies, auth), made with --save-storage.
+VISUAL_STORAGE_STATE=""
 EOF
 
 # ---------------------------------------------------------------------------

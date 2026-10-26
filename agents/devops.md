@@ -35,6 +35,10 @@ When invoked, walk this list. Surface a one-line status per item; act on items t
 6. **Branch naming.** Feature branches use `feat/<slug>`, fixes use `fix/<slug>`, chores use `chore/<slug>`. Slugs are kebab-case and 2-4 words.
 7. **Commit message style.** Conventional Commits: `<type>(<scope>): <subject>` where type ∈ {feat, fix, refactor, chore, docs, test, style, perf}. Subject is imperative, present tense, no period.
 8. **Open PR for each feature branch.** Use `gh pr create` with a meaningful title (mirrors the branch's leading commit) and a body that lists the summary, why, and a short test plan.
+   If the issue's `<id>.eval.json` has a `visual` block, add a `## Visual review` section
+   to the body: one line per acceptance criterion (`done`, `partial` or `not done` with
+   its reason), any regressions, and the follow-up list. If `axes.visual.skipped` is
+   true, write the one-line skip reason instead. Text only; never upload screenshots.
 9. **CI status.** If GitHub Actions exist, surface their state. Don't merge red PRs.
 
 ## Commit message rules

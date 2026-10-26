@@ -11,6 +11,8 @@
 # Exit codes: 0 verdict pass or concerns, 2 verdict fail, 1 the eval did not run.
 # Env: REVIEWER_FILE overrides the agent file (tests); EVAL_MODEL overrides the
 # model, otherwise the reviewer frontmatter's model: line is used.
+# With VISUAL_REVIEW=on in the config, visual-stage.sh also runs and adds a `visual`
+# axis; if it cannot run, this exits 1.
 
 set -euo pipefail
 
@@ -145,6 +147,14 @@ if vios:
         rule = v.get('rule','?')[:60]
         print(f"    [{sev}] {rule}")
 PY
+
+# Visual axis (VISUAL_REVIEW=on): screenshots judged against the issue, merged into
+# the eval file as `visual`. The overall verdict becomes the worst axis.
+if [[ "${VISUAL_REVIEW:-off}" == "on" ]]; then
+  visual_rc=0
+  "$(dirname "$0")/visual-stage.sh" "$ISSUE_FILE" "$GIT_REF" || visual_rc=$?
+  [[ $visual_rc -eq 1 ]] && exit 1
+fi
 
 # Exit 2 on a fail verdict so the caller can gate on it.
 VERDICT="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('verdict',''))" "$EVAL_FILE")"

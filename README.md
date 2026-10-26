@@ -139,6 +139,7 @@ harness ralph --merge-ready   Sweep ralph/parallel-* branches whose issue is Sta
 harness status                Show backlog: ready, blocked, done counts + current mode
 harness watch                 Terse heartbeat: one line per in-flight or completed ralph run
 harness match <sub>           Parity-match mode (clone / migration / rebrand)
+harness visual <issue> [ref]  Screenshot review of one issue's change (see Visual review below)
 harness mode <poc|full>       Set HARNESS_MODE
 harness design <on|off>       Set DESIGN_PHASE
 harness graduate              Shortcut: mode=full + design=on (ready-for-prod)
@@ -306,6 +307,46 @@ esac
 
 `CONTEXT_FILES` are **binding rules**. Ralph re-injects them on every iteration. If you want Tailwind-only styling, Convex-only data access, no barrel imports, etc., put them in `docs/rules.md` and list that file here. This is the forcing function that prevents the agent from "forgetting" the rules between iterations.
 
+## Visual review
+
+An optional third axis on the eval gate, next to Standards and Spec. When the change
+renders, the harness runs the app locally, screenshots the affected pages at each
+viewport, takes the same shots from a reference URL, and has the model judge them
+against the issue's acceptance criteria. Screenshots stay on disk under
+`issues/<feature>/screenshots/<id>/` and are gitignored automatically.
+
+Turn it on in `.claude/harness.config.sh` (`harness init` writes these keys, switched
+off, with the dev server guessed from `package.json`):
+
+```bash
+VISUAL_REVIEW="on"                          # off by default
+VISUAL_BASE_URL="https://staging.example.com"   # "before": staging or production (required)
+VISUAL_DEV_URL="http://localhost:4321"      # "after": the local build
+VISUAL_DEV_CMD="pnpm dev"                   # started if nothing answers at VISUAL_DEV_URL
+VISUAL_DEV_TIMEOUT_SECS=120                 # fail if the dev server is not up by then
+VISUAL_VIEWPORTS="1440x900 390x844"         # desktop and mobile
+VISUAL_STORAGE_STATE=""                     # optional cookies/auth file (playwright --save-storage)
+```
+
+How it decides:
+
+- **Skip.** If every changed file is a test, CI, docs, lockfile or harness file, it
+  skips with no model call. Anything else counts as possibly visible.
+- **Routes.** A `Routes: /pricing, /about` line in the issue wins. Otherwise the model
+  maps the changed files to routes; if none render, it skips with a reason.
+- **Verdict.** Each acceptance criterion is `done`, `partial` or `not done`.
+  Unintended changes are `breakage` (overflow, overlap, missing sections) or `drift`
+  (content that may differ between staging and local). Any `not done` or `breakage`
+  is a `fail` and sends the issue back like any other eval fail. `partial` or `drift`
+  is `concerns`.
+- **Never silent.** A missing `VISUAL_BASE_URL`, a dev server that never answers, or
+  unreadable model output exits 1, which the gate treats as "eval did not run".
+
+Screenshots are a secondhand signal: good for "was the ticket done, did anything
+obviously break", not for pixel parity. In `parity-match` mode the live-CSS audit
+stays the gate. Run it by hand with `harness visual issues/<feature>/<id>.md [ref]`.
+The first run downloads Playwright's Chromium (about 150 MB, once per machine).
+
 ---
 
 ## Issue file format
@@ -440,6 +481,7 @@ After `./install.sh`, the layout under `~/.claude/`:
 │   ├── ralph.sh                                   # autonomous loop (incl. --parallel)
 │   ├── ralph-progress.sh                          # stream-json progress renderer
 │   ├── eval-stage.sh                              # reviewer dispatch + JSON emit
+│   ├── visual-stage.sh                            # screenshot review, adds the visual eval axis
 │   └── with-lock.sh                               # portable mkdir mutex (macOS has no flock)
 ├── skills/                                        # installed skills (Anthropic + Vercel + community)
 │   ├── _install-skill.sh                          # `~/.claude/skills/_install-skill.sh <github-tree-url>`
@@ -556,6 +598,9 @@ The harness dispatches skills and tools it does not vendor (they have their own 
 npm install -g @pencil.dev/cli   &&   pencil login
 npm install -g skillui
 ```
+
+**Visual review** (only needed with `VISUAL_REVIEW="on"`): Node with `npx`. Playwright
+and its Chromium are fetched on first run.
 
 **Security tooling** (only needed in `full` mode for the security agent):
 
