@@ -93,6 +93,24 @@ done <<< "$CHANGED"
 
 [[ -n "${VISUAL_BASE_URL:-}" ]] || die "VISUAL_BASE_URL is not set in $CONFIG_FILE"
 [[ -n "${VISUAL_DEV_URL:-}" ]] || die "VISUAL_DEV_URL is not set in $CONFIG_FILE"
+[[ -z "${VISUAL_STORAGE_STATE:-}" || -f "$VISUAL_STORAGE_STATE" ]] \
+  || die "VISUAL_STORAGE_STATE file $VISUAL_STORAGE_STATE is missing; make it with: harness visual-state"
+
+# "Before" is whatever VISUAL_BASE_URL deploys from. If that branch already has the
+# change, both sides show it and the comparison proves nothing. A branch far behind
+# it shows the base's newer work as differences, so say so.
+BASE_BRANCH="${VISUAL_BASE_BRANCH:-$(git symbolic-ref -q --short refs/remotes/origin/HEAD || true)}"
+BEHIND_NOTE=""
+if [[ -n "$BASE_BRANCH" ]] && git rev-parse -q --verify "$BASE_BRANCH^{commit}" > /dev/null; then
+  if [[ "$GIT_REF" != "STAGED" ]] && git merge-base --is-ancestor "$GIT_REF" "$BASE_BRANCH"; then
+    die "$GIT_REF is already on $BASE_BRANCH, so $VISUAL_BASE_URL shows the change too; review it before it merges"
+  fi
+  behind="$(git rev-list --count "HEAD..$BASE_BRANCH")"
+  if (( behind > ${VISUAL_MAX_BEHIND:-20} )); then
+    BEHIND_NOTE="\"before\" also has $behind commits from $BASE_BRANCH that are not in this build; differences they explain are drift."
+    echo "⚠ $behind commits on $BASE_BRANCH are not in this build; update the branch or expect drift from them" >&2
+  fi
+fi
 
 mkdir -p "$SHOTS"
 echo '*' > "$(dirname "$SHOTS")/.gitignore"
@@ -131,7 +149,9 @@ if [[ -z "$ROUTES" ]]; then
   ROUTES_PROMPT="VISUAL_ROUTES. You are picking which URL paths of a web app to screenshot so a
 reviewer can see the change below. Read the changed files if you need to. Map each
 changed file to the page routes that render it (any framework). Only list routes that
-exist in the app after this change. If nothing changed renders in a browser (for
+exist in the app after this change. When an acceptance criterion names variants of a
+page (languages, regions, themes, signed in or out), list a route for each variant it
+names, not just the default. If nothing changed renders in a browser (for
 example server-only code), return an empty list.
 
 ## Issue
@@ -176,7 +196,7 @@ VERDICT_PROMPT="You are reviewing a UI change from screenshots. Use the Read too
 every image listed below, then judge the change against the issue.
 
 \"before\" is ${VISUAL_BASE_URL} (staging or production). \"after\" is the local build
-with the change. File names are <before|after>-<viewport>-<route>.png.
+with the change. File names are <before|after>-<viewport>-<route>.png. ${BEHIND_NOTE}
 
 1. For each acceptance criterion in the issue, decide \"done\", \"partial\" or
    \"not done\", with a one-line reason that cites what is visible. Criteria that cannot

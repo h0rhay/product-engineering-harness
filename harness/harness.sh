@@ -35,6 +35,7 @@ Mode flags (per-project, edits .claude/harness.config.sh):
   harness watch                 Terse heartbeat: one line per in-flight or completed ralph run
   harness match <sub>           Parity-match mode (clone / migration / rebrand)
   harness visual <issue> [ref]  Screenshot review of an issue's change (default ref HEAD)
+  harness visual-state          Save a browser state so screenshots skip prompts and sign-in
 
   harness help                  This message
 
@@ -58,6 +59,7 @@ case "$cmd" in
   watch)           exec "$HARNESS_DIR/harness-watch.sh" "$@" ;;
   match)           exec "$HARNESS_DIR/harness-match.sh" "$@" ;;
   visual)          exec "$HARNESS_DIR/visual-stage.sh" "$@" ;;
+  visual-state)    exec "$HARNESS_DIR/visual-state.sh" "$@" ;;
   help|--help|-h)  usage ;;
   *)
     echo "Unknown command: $cmd" >&2

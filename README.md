@@ -325,22 +325,38 @@ VISUAL_DEV_URL="http://localhost:4321"      # "after": the local build
 VISUAL_DEV_CMD="pnpm dev"                   # started if nothing answers at VISUAL_DEV_URL
 VISUAL_DEV_TIMEOUT_SECS=120                 # fail if the dev server is not up by then
 VISUAL_VIEWPORTS="1440x900 390x844"         # desktop and mobile
-VISUAL_STORAGE_STATE=""                     # optional cookies/auth file (playwright --save-storage)
+VISUAL_STORAGE_STATE=""                     # optional saved browser state, made with: harness visual-state
+VISUAL_BASE_BRANCH=""                       # branch VISUAL_BASE_URL deploys from (default: repo default branch)
+VISUAL_MAX_BEHIND=20                        # warn when this many of its commits are missing locally
 ```
 
 How it decides:
 
 - **Skip.** If every changed file is a test, CI, docs, lockfile or harness file, it
   skips with no model call. Anything else counts as possibly visible.
-- **Routes.** A `Routes: /pricing, /about` line in the issue wins. Otherwise the model
-  maps the changed files to routes; if none render, it skips with a reason.
+- **Before must differ from after.** The review compares the deployed site with your
+  local build, so it has to run before the change merges. If the commit is already on
+  the base branch it exits 1 rather than compare the change with itself. If your branch
+  is more than `VISUAL_MAX_BEHIND` commits behind, it warns and treats differences from
+  those commits as drift: update the branch for a cleaner read.
+- **Routes.** A `Routes: /pricing, /about` line in the issue wins. List every page a
+  criterion names, including each variant (languages, regions, themes): only listed
+  routes get checked, so a criterion about variants you did not list comes back
+  `partial`. Without the line, the model maps the changed files to routes; if none
+  render, it skips with a reason.
+- **Prompts and sign-in.** Anything that appears on one side and not the other (a consent
+  prompt, a welcome dialog, a signed-out page) reads as a difference. Set
+  `VISUAL_STORAGE_STATE` to a gitignored path and run `harness visual-state` once: it
+  opens both sites, you dismiss or sign in by hand, and every later screenshot starts
+  from that state. It works with any site, since the harness never clicks anything.
 - **Verdict.** Each acceptance criterion is `done`, `partial` or `not done`.
   Unintended changes are `breakage` (overflow, overlap, missing sections) or `drift`
   (content that may differ between staging and local). Any `not done` or `breakage`
   is a `fail` and sends the issue back like any other eval fail. `partial` or `drift`
   is `concerns`.
-- **Never silent.** A missing `VISUAL_BASE_URL`, a dev server that never answers, or
-  unreadable model output exits 1, which the gate treats as "eval did not run".
+- **Never silent.** A missing `VISUAL_BASE_URL`, a missing `VISUAL_STORAGE_STATE` file,
+  a change already on the base branch, a dev server that never answers, or unreadable
+  model output exits 1, which the gate treats as "eval did not run".
 
 Screenshots are a secondhand signal: good for "was the ticket done, did anything
 obviously break", not for pixel parity. In `parity-match` mode the live-CSS audit

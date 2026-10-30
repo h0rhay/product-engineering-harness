@@ -145,8 +145,13 @@ VISUAL_DEV_URL="${VISUAL_DEV_URL_DEFAULT}"
 VISUAL_DEV_CMD="${VISUAL_DEV_CMD_DEFAULT}"
 VISUAL_DEV_TIMEOUT_SECS=120
 VISUAL_VIEWPORTS="1440x900 390x844"
-# Optional Playwright storage file (cookies, auth), made with --save-storage.
+# Optional saved browser state, so screenshots skip consent prompts and sign-in.
+# Set a gitignored path (.scratch/visual-state.json), then run: harness visual-state
 VISUAL_STORAGE_STATE=""
+# Branch VISUAL_BASE_URL deploys from. Empty means the repo's default branch.
+VISUAL_BASE_BRANCH=""
+# Warn when this many commits on that branch are missing from the local build.
+VISUAL_MAX_BEHIND=20
 EOF
 
 # ---------------------------------------------------------------------------
