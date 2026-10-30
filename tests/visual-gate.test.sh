@@ -22,10 +22,18 @@ EOF
 git branch base
 printf 'Status: ready-for-agent\n\n# Thing\n\n## Acceptance criteria\n\n- [ ] Shows a banner\n' > issues/f/01-thing.md
 
-# Fake npx: "playwright screenshot ... <url> <out>" writes <out>, anything else succeeds
+# Fake npx: finds the fake playwright; "open" saves storage. Fake node: writes the screenshot.
+cat > "$TMP/bin/playwright" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+cat > "$TMP/bin/node" <<'SH'
+#!/usr/bin/env bash
+echo png > "${@: -1}"
+SH
 cat > "$TMP/bin/npx" <<'SH'
 #!/usr/bin/env bash
-[[ " $* " == *" screenshot "* ]] && echo png > "${@: -1}"
+[[ " $* " == *" -c "* ]] && command -v playwright
 if [[ " $* " == *" open "* ]]; then
   echo "$*" >> "$NPX_LOG"
   while [[ $# -gt 0 ]]; do [[ "$1" == --save-storage ]] && echo '{}' > "$2"; shift; done
@@ -38,7 +46,7 @@ cat > "$TMP/bin/claude" <<'SH'
 echo call >> "$CLAUDE_LOG"
 if [[ "$*" == *"VISUAL_ROUTES"* ]]; then echo '{"routes":["/"],"reason":"index"}'; else echo "$FAKE_VISUAL"; fi
 SH
-chmod +x "$TMP/bin/npx" "$TMP/bin/claude"
+chmod +x "$TMP/bin/npx" "$TMP/bin/claude" "$TMP/bin/node" "$TMP/bin/playwright"
 export PATH="$TMP/bin:$PATH" CLAUDE_LOG="$TMP/claude.log" NPX_LOG="$TMP/npx.log"
 
 EVAL=issues/f/01-thing.eval.json
@@ -61,6 +69,10 @@ notdone='{"criteria":[{"criterion":"Shows a banner","status":"not done","reason"
 broken='{"criteria":[{"criterion":"Shows a banner","status":"done","reason":"ok"}],"regressions":[{"route":"/","severity":"breakage","description":"overflow"}]}'
 drift='{"criteria":[{"criterion":"Shows a banner","status":"done","reason":"ok"}],"regressions":[{"route":"/","severity":"drift","description":"copy differs"}]}'
 
+content='{"criteria":[{"criterion":"Shows a banner","status":"done","reason":"ok"}],"regressions":[{"route":"/","severity":"content","description":"count differs"}]}'
+
+[[ "$(run "$content")" == 0 ]] || fail "content should exit 0";    [[ "$(verdict)" == pass ]]     || fail "content differences alone should pass"
+grep -q '1 content' "$EVAL" || fail "content differences should still be reported"
 [[ "$(run "$done_")" == 0 ]]   || fail "done should exit 0";       [[ "$(verdict)" == pass ]]     || fail "done should pass"
 [[ "$(run "$partial")" == 0 ]] || fail "partial should exit 0";    [[ "$(verdict)" == concerns ]] || fail "partial should be concerns"
 [[ "$(run "$notdone")" == 2 ]] || fail "not done should exit 2";   [[ "$(verdict)" == fail ]]     || fail "not done should fail"
@@ -71,6 +83,61 @@ drift='{"criteria":[{"criterion":"Shows a banner","status":"done","reason":"ok"}
 # The dev server it started is stopped again, and screenshots stay out of git
 curl -sf -o /dev/null "http://127.0.0.1:$PORT" && fail "dev server left running"
 [[ -z "$(git status --porcelain -- issues/f/screenshots)" ]] || fail "screenshots not gitignored"
+
+# A dev command that detaches into its own session is still stopped
+cat > detach.py <<EOF
+import subprocess, sys
+subprocess.Popen([sys.executable, "-m", "http.server", "$PORT"], start_new_session=True,
+                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+EOF
+cp .claude/harness.config.sh config.bak
+sed -i.bak 's#^VISUAL_DEV_CMD=.*#VISUAL_DEV_CMD="python3 detach.py"#' .claude/harness.config.sh
+[[ "$(run "$done_")" == 0 ]] || fail "a detaching dev command should still run"
+curl -sf -o /dev/null "http://127.0.0.1:$PORT" && fail "detached dev server left running"
+mv config.bak .claude/harness.config.sh; rm -f .claude/harness.config.sh.bak detach.py
+
+# The prompt carries the measurements, and a criterion cannot pass on a side effect.
+# Fake screenshots are not PNGs, so this pair is reported as not measured, not fatal.
+cp "$TMP/bin/claude" "$TMP/claude.keep"
+cat > "$TMP/bin/claude" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$CLAUDE_LOG"
+if [[ "$*" == *"VISUAL_ROUTES"* ]]; then echo '{"routes":["/"],"reason":"index"}'; else echo "$FAKE_VISUAL"; fi
+SH
+: > "$CLAUDE_LOG"
+run "$done_" >/dev/null
+grep -q "not measured" "$CLAUDE_LOG" || fail "unreadable screenshots should be reported as not measured"
+grep -q "A side effect" "$CLAUDE_LOG" || fail "the prompt should reject side effects as evidence"
+cp "$TMP/claude.keep" "$TMP/bin/claude"
+
+# visual-diff: finds only an inserted line, lines up what follows, reads its colour, crops it
+python3 - "$TMP/before.png" "$TMP/after.png" <<'PY'
+import struct, sys, zlib
+def png(path, rows, filt):
+    w = len(rows[0]) // 3
+    def chunk(k, b): return struct.pack(">I", len(b)) + k + b + struct.pack(">I", zlib.crc32(k + b))
+    def encode(y, r):
+        if filt == 1: return b"\1" + r[:3] + bytes((r[i] - r[i - 3]) & 255 for i in range(3, len(r)))
+        if filt == 2 and y:
+            return b"\2" + bytes((a - b) & 255 for a, b in zip(r, rows[y - 1]))
+        return b"\0" + r
+    body = b"".join(encode(y, r) for y, r in enumerate(rows))
+    open(path, "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, len(rows), 8, 2, 0, 0, 0))
+                           + chunk(b"IDAT", zlib.compress(body)) + chunk(b"IEND", b""))
+row = lambda y: bytes((y * 7 + x) & 255 for x in range(30))
+page = [row(y) for y in range(100)]
+line = [bytes.fromhex("e4572e") * 10] * 8
+png(sys.argv[1], page, 2)
+png(sys.argv[2], page[:50] + line + page[50:], 1)
+PY
+out="$(python3 "$HARNESS/visual-diff.py" "$TMP/before.png" "$TMP/after.png" "$TMP/zoom")"
+grep -q "after y=50-58 (8px, mostly #e4572e)" <<< "$out" || fail "should measure the inserted line: $out"
+[[ "$(wc -l <<< "$out" | tr -d ' ')" == 1 ]] || fail "rows after the insert should line up: $out"
+[[ -s "$TMP/zoom-1-after.png" ]] || fail "should write a crop of the change"
+[[ "$(python3 "$HARNESS/visual-diff.py" "$TMP/before.png" "$TMP/before.png" "$TMP/same")" == "no pixel differences" ]] \
+  || fail "identical images should report no differences"
+[[ "$(python3 "$HARNESS/visual-diff.py" "$TMP/none.png" "$TMP/before.png" "$TMP/x" >/dev/null 2>&1 && echo 0 || echo $?)" == 1 ]] \
+  || fail "an unreadable image should exit 1"
 
 # Overall verdict is the worst axis: a reviewer pass plus a visual fail is a fail
 echo '{"verdict":"pass","axes":{"standards":{"verdict":"pass"},"spec":{"verdict":"pass"}}}' > "$EVAL"
@@ -113,4 +180,4 @@ sed -i.bak '/VISUAL_STORAGE_STATE/d' .claude/harness.config.sh
 sed -i.bak '/VISUAL_BASE_URL/d' .claude/harness.config.sh
 [[ "$(run "$done_")" == 1 ]] || fail "missing VISUAL_BASE_URL should exit 1"
 
-echo "visual-gate: 23 checks passed"
+echo "visual-gate: 33 checks passed"

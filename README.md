@@ -349,11 +349,22 @@ How it decides:
   `VISUAL_STORAGE_STATE` to a gitignored path and run `harness visual-state` once: it
   opens both sites, you dismiss or sign in by hand, and every later screenshot starts
   from that state. It works with any site, since the harness never clicks anything.
-- **Verdict.** Each acceptance criterion is `done`, `partial` or `not done`.
-  Unintended changes are `breakage` (overflow, overlap, missing sections) or `drift`
-  (content that may differ between staging and local). Any `not done` or `breakage`
-  is a `fail` and sends the issue back like any other eval fail. `partial` or `drift`
-  is `concerns`.
+- **Capture.** Each page is scrolled top to bottom before its screenshot, so lazy content
+  has loaded, whatever the stack.
+- **Dev-only overlays.** A framework's dev toolbar or error overlay shows up as a
+  difference. Turn it off for the review, through your framework's setting or by pointing
+  `VISUAL_DEV_CMD` and `VISUAL_DEV_URL` at a production-style local build.
+- **Seeing small changes.** A full-page screenshot gets shrunk when the model reads it, so
+  a thin line disappears. `visual-diff.py` lines up identical pixel rows, then gives the
+  model each changed band's position, size and main colour, plus full-resolution crops
+  (up to 6 per page, height changes first). `done` needs the thing itself, seen or
+  measured; a side effect such as a taller page is not enough.
+- **Verdict.** Each acceptance criterion is `done`, `partial` or `not done`. Unintended
+  changes are `breakage` (overflow, overlap, missing sections), `drift` (layout or styling
+  that moved) or `content` (the same element with different data, such as a live count).
+  Any `not done` or `breakage` is a `fail` and sends the issue back like any other eval
+  fail. `partial` or `drift` is `concerns`. `content` is listed but does not change the
+  verdict.
 - **Never silent.** A missing `VISUAL_BASE_URL`, a missing `VISUAL_STORAGE_STATE` file,
   a change already on the base branch, a dev server that never answers, or unreadable
   model output exits 1, which the gate treats as "eval did not run".
@@ -498,6 +509,8 @@ After `./install.sh`, the layout under `~/.claude/`:
 │   ├── ralph-progress.sh                          # stream-json progress renderer
 │   ├── eval-stage.sh                              # reviewer dispatch + JSON emit
 │   ├── visual-stage.sh                            # screenshot review, adds the visual eval axis
+│   ├── visual-capture.js                          # scrolls a page, then screenshots it
+│   ├── visual-diff.py                             # measures and crops what changed between two screenshots
 │   └── with-lock.sh                               # portable mkdir mutex (macOS has no flock)
 ├── skills/                                        # installed skills (Anthropic + Vercel + community)
 │   ├── _install-skill.sh                          # `~/.claude/skills/_install-skill.sh <github-tree-url>`
@@ -615,8 +628,9 @@ npm install -g @pencil.dev/cli   &&   pencil login
 npm install -g skillui
 ```
 
-**Visual review** (only needed with `VISUAL_REVIEW="on"`): Node with `npx`. Playwright
-and its Chromium are fetched on first run.
+**Visual review** (only needed with `VISUAL_REVIEW="on"`): Node with `npx`, and
+`python3`. Playwright and its Chromium are fetched on first run. `lsof` lets it stop a dev
+server that detaches itself.
 
 **Security tooling** (only needed in `full` mode for the security agent):
 

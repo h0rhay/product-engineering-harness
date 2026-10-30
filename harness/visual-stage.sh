@@ -38,6 +38,7 @@ EVAL_FILE="$(dirname "$ISSUE_FILE")/$(basename "$ISSUE_FILE" .md).eval.json"
 SHOTS="$(dirname "$ISSUE_FILE")/screenshots/$(basename "$ISSUE_FILE" .md)"
 MODEL="${VISUAL_MODEL:-sonnet}"
 VIEWPORTS="${VISUAL_VIEWPORTS:-1440x900 390x844}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Write the visual axis into the eval file. Overall verdict = worst axis.
 # Args: verdict, notes, skipped (true|false), detail JSON.
@@ -117,12 +118,19 @@ echo '*' > "$(dirname "$SHOTS")/.gitignore"
 rm -f "$SHOTS"/*.png
 
 # Dev server: reuse one that already answers, otherwise start it in its own process
-# group so the whole tree (pnpm, vite, node) can be stopped on exit.
+# group so the whole tree (pnpm, vite, node) can be stopped on exit. Some dev commands
+# detach into the background and escape the group. Nothing answered on this port before
+# we started, so whatever listens on it now is ours.
 SERVER_PID=""
 stop_server() {
   [[ -n "$SERVER_PID" ]] || return 0
   kill -- -"$SERVER_PID" 2>/dev/null || true
   wait "$SERVER_PID" 2>/dev/null || true
+  local port listeners
+  port="$(sed -nE 's#^[a-z]+://[^/:]+:([0-9]+).*#\1#p' <<< "$VISUAL_DEV_URL")"
+  [[ -n "$port" ]] || return 0
+  listeners="$(lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null || true)"
+  [[ -z "$listeners" ]] || kill $listeners 2>/dev/null || true
 }
 trap stop_server EXIT
 
@@ -134,9 +142,14 @@ if ! curl -sf -o /dev/null "$VISUAL_DEV_URL"; then
   SERVER_PID=$!
   set +m
   timeout="${VISUAL_DEV_TIMEOUT_SECS:-120}"
+  waiting=1
   for ((i = 0; i < timeout; i++)); do
     curl -sf -o /dev/null "$VISUAL_DEV_URL" && break
-    kill -0 "$SERVER_PID" 2>/dev/null || die "dev server exited; see $SHOTS/dev-server.log"
+    # A clean exit may mean the command detached a server that is still coming up.
+    if [[ $waiting -eq 1 ]] && ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      wait "$SERVER_PID" || die "dev server exited; see $SHOTS/dev-server.log"
+      waiting=0
+    fi
     sleep 1
   done
   curl -sf -o /dev/null "$VISUAL_DEV_URL" \
@@ -169,10 +182,14 @@ Output nothing but JSON: {\"routes\": [\"/path\"], \"reason\": \"<one line>\"}"
   [[ -n "$ROUTES" ]] || skip "$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("reason", "no routes render this change"))' "$ROUTES_JSON")"
 fi
 
-npx -y playwright install chromium > /dev/null 2>&1 || die "could not install Chromium for Playwright"
+PLAYWRIGHT="$(npx -y -p playwright -c 'command -v playwright')" || die "could not find Playwright"
+"$PLAYWRIGHT" install chromium > /dev/null 2>&1 || die "could not install Chromium for Playwright"
+export NODE_PATH="$(dirname "$(dirname "$PLAYWRIGHT")")"
+export VISUAL_STORAGE_STATE
 
 SHOT_LIST=""
 MISSING=""
+DIFFS=""
 for route in $ROUTES; do
   slug="$(echo "$route" | sed -E 's#^/+##; s#/+$##; s#[^A-Za-z0-9]+#-#g')"
   slug="${slug:-home}"
@@ -180,14 +197,18 @@ for route in $ROUTES; do
     for side in before after; do
       base="$VISUAL_DEV_URL"; [[ $side == before ]] && base="$VISUAL_BASE_URL"
       out="$SHOTS/$side-$vp-$slug.png"
-      if npx -y playwright screenshot --full-page --timeout 60000 --viewport-size="${vp/x/,}" \
-          ${VISUAL_STORAGE_STATE:+--load-storage "$VISUAL_STORAGE_STATE"} \
-          "${base%/}$route" "$out" > /dev/null 2>&1; then
+      if node "$HERE/visual-capture.js" "$vp" "${base%/}$route" "$out" > /dev/null 2>&1; then
         SHOT_LIST+="$out"$'\n'
       else
         MISSING+="$side $vp $route"$'\n'
       fi
     done
+    before="$SHOTS/before-$vp-$slug.png"; after="$SHOTS/after-$vp-$slug.png"
+    if [[ -f "$before" && -f "$after" ]]; then
+      diff="$(python3 "$HERE/visual-diff.py" "$before" "$after" "$SHOTS/zoom-$vp-$slug" 2>&1)" \
+        || diff="not measured: $diff"
+      DIFFS+="### $route at $vp"$'\n'"$diff"$'\n\n'
+    fi
   done
 done
 grep -q '/after-' <<< "$SHOT_LIST" || die "no 'after' screenshot could be taken from $VISUAL_DEV_URL"
@@ -198,15 +219,26 @@ every image listed below, then judge the change against the issue.
 \"before\" is ${VISUAL_BASE_URL} (staging or production). \"after\" is the local build
 with the change. File names are <before|after>-<viewport>-<route>.png. ${BEHIND_NOTE}
 
+Full-page images are shrunk when you read them, so small details disappear. Use them
+for overall layout. For detail, use the measured differences below: every band of pixels
+that changed, with its size and main colour, and full-resolution crops. Open every crop
+on every route and viewport before judging, including the ones that look like repeats. Do
+not guess what a band is from its numbers.
+
 1. For each acceptance criterion in the issue, decide \"done\", \"partial\" or
-   \"not done\", with a one-line reason that cites what is visible. Criteria that cannot
-   be seen in a screenshot (tests, analytics, code structure) are \"done\" with reason
-   \"not visual\".
+   \"not done\", with a one-line reason that cites what is visible or measured. \"done\"
+   needs the thing itself: seen in an image, or confirmed by a measured size and colour.
+   A side effect, such as the page getting taller, is not enough. If you cannot confirm a
+   stated detail such as a colour, it is \"partial\"; if what you can see contradicts it,
+   \"not done\". Criteria that cannot be seen in a screenshot (tests, analytics, code
+   structure) are \"done\" with reason \"not visual\".
 2. List unintended changes between before and after that the issue did not ask for.
+   Things moving only because the requested change takes up space are not a change.
    Severity \"breakage\": horizontal overflow on mobile, overlapping or cut-off
-   elements, missing sections, broken layout. Severity \"drift\": differences that may
-   come from staging and the local build having different content, data or flags
-   (different text, images, item counts). Judge layout and structure, not content.
+   elements, missing sections, broken layout. Severity \"drift\": layout or styling that
+   moved or changed without being asked for. Severity \"content\": the same element with
+   different data, such as changed text, counts or reordered items, which staging and the
+   local build can legitimately disagree on.
 
 Screenshots are a secondhand signal. They show whether the ticket was done and whether
 anything obviously broke. They are not a source of truth for pixel parity, so never
@@ -219,13 +251,16 @@ $(cat "$ISSUE_FILE")
 ## Screenshots
 
 ${SHOT_LIST}
+## Measured differences
+
+${DIFFS:-none}
 ## Captures that failed (a failed \"after\" capture means the page is broken locally)
 
 ${MISSING:-none}
 
 Output nothing but JSON:
 {\"criteria\": [{\"criterion\": \"...\", \"status\": \"done|partial|not done\", \"reason\": \"...\"}],
- \"regressions\": [{\"route\": \"/\", \"viewport\": \"390x844\", \"severity\": \"breakage|drift\", \"description\": \"...\"}],
+ \"regressions\": [{\"route\": \"/\", \"viewport\": \"390x844\", \"severity\": \"breakage|drift|content\", \"description\": \"...\"}],
  \"follow_up\": [\"<remaining work, one line each>\"]}"
 
 echo "Visual review of $ID: routes $ROUTES"
@@ -233,13 +268,14 @@ DETAIL="$(claude --dangerously-skip-permissions --model "$MODEL" -p "$VERDICT_PR
   || die "visual reviewer did not return JSON"
 
 # Deterministic gate: not done or breakage fails; partial or drift is concerns.
+# Content differences are reported but never change the verdict.
 read -r VERDICT NOTES < <(python3 -c '
 import json, sys
 d = json.loads(sys.argv[1])
 s = [c.get("status") for c in d.get("criteria", [])]
 r = [x.get("severity") for x in d.get("regressions", [])]
 v = "fail" if "not done" in s or "breakage" in r else "concerns" if "partial" in s or "drift" in r else "pass"
-print(v, "%d/%d criteria done, %d breakage, %d drift" % (s.count("done"), len(s), r.count("breakage"), r.count("drift")))
+print(v, "%d/%d criteria done, %d breakage, %d drift, %d content" % (s.count("done"), len(s), r.count("breakage"), r.count("drift"), r.count("content")))
 ' "$DETAIL")
 
 DETAIL="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); d["routes"]=sys.argv[2].split(); d["screenshots"]=sys.argv[3]; print(json.dumps(d))' "$DETAIL" "$ROUTES" "$SHOTS")"
