@@ -371,6 +371,7 @@ harness ralph --target deploy-prep   # devops sets up remote, branches, PR conve
 ```
 inbound bug:    /triage <ref>  →  /diagnose if needed  →  harness ralph --once
 new feature:    /grill-with-docs  →  /to-prd  →  /to-issues  →  harness ralph N
+                →  before merge: fold issues into SUMMARY.md (keep PRD.md + SUMMARY.md)
 status check:   harness status
 ```
 
