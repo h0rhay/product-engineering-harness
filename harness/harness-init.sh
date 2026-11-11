@@ -190,6 +190,24 @@ issue files in `.scratch/`; that directory is gitignored and holds transient art
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md`)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 
+## Closing a feature: fold the issues into SUMMARY.md
+
+Issue files are working notes; keep as many as the work needs while it is in flight. The
+last commit before a feature's PR merges folds them into one short
+`issues/<feature-slug>/SUMMARY.md` and deletes everything else in the folder, so only
+`PRD.md` and `SUMMARY.md` remain (a ticket with no PRD keeps `SUMMARY.md` alone).
+
+`SUMMARY.md` has no `Status:` line (Ralph ignores it) and stays under about 50 lines:
+
+- **Header:** the ticket key, the PR number, the spec of record, one line on what was folded.
+- **What shipped:** one bullet per behaviour, naming the files or rules a reader needs.
+- **Verified:** the evidence, with numbers (test counts, live checks, gotchas found).
+- **Follow-ups:** open acceptance criteria and after-merge steps, as `- [ ]` items.
+
+Delete the numbered issues and any feature-level `CONTEXT.md` or `PRIMITIVES.md`; anything
+still worth keeping goes into the PRD or the summary. Repoint links to deleted files. Git
+history keeps the originals.
+
 ## When a skill says "publish to the issue tracker"
 
 Create a new file under `issues/<feature-slug>/` (creating the directory if needed).

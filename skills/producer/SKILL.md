@@ -220,6 +220,11 @@ reviewer per the mode/design flags), runs quality gates, and commits.
 Only after Phase 3 sign-off. The Engineering Contract from global `CLAUDE.md` governs
 every iteration.
 
+**Close-out (last commit before the PR merges).** Fold the feature's issue files into one
+short `issues/<feature>/SUMMARY.md` (what shipped, verified, follow-ups) and delete the
+rest, so only `PRD.md` and `SUMMARY.md` remain. The format is "Closing a feature" in
+`docs/agents/issue-tracker.md`. Then clear the phase marker.
+
 ## Quick Reference
 
 | Phase | Drives | Output | Gate |
@@ -227,7 +232,7 @@ every iteration.
 | 1. Spec | mode question (clone or greenfield), `harness init`, mode-specific context-gathering skills (opt-in), `/grill-with-docs` | CONTEXT.md including the build mode + sources/refs gathered | spec + context sign-off |
 | 2. Arch & Tooling | global CLAUDE.md process; name behaviour-primitive library; connect framework docs MCPs | docs/rules.md, project CLAUDE.md, harness.config.sh | tooling sign-off |
 | 3. PRD & Issues | `/to-prd`, **Primitives Plan**, `/to-issues` | PRD.md + PRIMITIVES.md + issues/*.md | issue-set + primitives sign-off |
-| 4. Build | `harness ralph` | committed slices | per-issue reviewer eval |
+| 4. Build | `harness ralph`, then close-out | committed slices, then PRD.md + SUMMARY.md only | per-issue reviewer eval |
 
 ## Rationalizations, all of these mean STOP
 
