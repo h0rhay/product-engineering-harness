@@ -49,7 +49,21 @@ cmd="${1:-help}"
 
 case "$cmd" in
   init)            exec "$HARNESS_DIR/harness-init.sh" "$@" ;;
-  ralph)           exec "$HARNESS_DIR/ralph.sh" "$@" ;;
+  ralph)
+    # Every ralph run gets a visible Terminal window following its output (George, 26 Nov 2026).
+    # Interactive runs already show output. Otherwise follow the file stdout points at, or
+    # tee into .scratch/ralph-run.log when stdout is a pipe.
+    if [[ ! -t 1 ]]; then
+      log="$(lsof -a -p $$ -d 1 -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
+      if [[ ! -f "$log" ]]; then
+        mkdir -p "$PWD/.scratch"
+        log="$PWD/.scratch/ralph-run.log"
+        : > "$log"
+        exec > >(tee -a "$log") 2>&1
+      fi
+      "$HARNESS_DIR/open-log-terminal.sh" "$log" "$(basename "$PWD") build (harness)" || true
+    fi
+    exec "$HARNESS_DIR/ralph.sh" "$@" ;;
   status)          exec "$HARNESS_DIR/harness-status.sh" "$@" ;;
   mode)            exec "$HARNESS_DIR/harness-toggle.sh" mode "$@" ;;
   design)          exec "$HARNESS_DIR/harness-toggle.sh" design "$@" ;;

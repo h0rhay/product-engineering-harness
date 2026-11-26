@@ -219,3 +219,21 @@ preflight on the identical command (unused catch binding), most plausibly a
 stale eslint cache in one of the two contexts. Before dispatching ralph on
 a branch with fresh manual commits, run the lint gate cold (or clear
 .eslintcache) so the iteration does not die at preflight.
+
+## 2026-11-26, every ralph run opens a visible log window
+
+George found a Terminal window following the build log "REALLY useful" during the Glimmer
+build and asked for it on every PEH build. `harness ralph` now calls
+`open-log-terminal.sh` whenever stdout is not an interactive terminal: it follows the file
+stdout is redirected to, or tees into `.scratch/ralph-run.log` when stdout is a pipe, and
+opens a titled Terminal window on it. Opt out only with `HARNESS_NO_TERMINAL=1`, and only
+when George asks. Pair it with the 5-minute heartbeat above and a live local preview.
+
+Gotchas found the same day:
+
+- A repo with no remote crashed ralph at start (exit 128, empty log): `git symbolic-ref
+  refs/remotes/origin/HEAD` fails under `set -euo pipefail`. Workaround
+  `RALPH_ALLOW_STALE=1`; the real fix is `|| true` on that line in `ralph.sh`.
+- A dev server an agent leaves on the e2e port fails the gate ("port is already used").
+  Give Playwright its own port, separate from any preview or agent dev server.
+- Do not edit `ralph.sh` while a run is going: bash reads the script as it runs.
